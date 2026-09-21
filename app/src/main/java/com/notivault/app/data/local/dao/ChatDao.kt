@@ -1,9 +1,8 @@
 package com.notivault.app.data.local.dao
 
 import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Upsert
 import com.notivault.app.data.local.entity.ChatThreadEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -21,7 +20,7 @@ interface ChatDao {
     @Query("SELECT * FROM chat_threads WHERE threadId = :threadId LIMIT 1")
     suspend fun getThreadSync(threadId: String): ChatThreadEntity?
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun insertOrUpdateThread(thread: ChatThreadEntity)
 
     @Query("""

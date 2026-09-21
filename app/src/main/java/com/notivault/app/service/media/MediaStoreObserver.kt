@@ -27,7 +27,7 @@ class MediaStoreObserver(
             )
 
             val isItemUri = uri.lastPathSegment?.toLongOrNull() != null
-            val sortOrder = if (isItemUri) null else "${MediaStore.MediaColumns.DATE_ADDED} DESC LIMIT 1"
+            val sortOrder = if (isItemUri) null else "${MediaStore.MediaColumns.DATE_ADDED} DESC"
 
             contentResolver.query(uri, projection, null, null, sortOrder)?.use { cursor ->
                 if (cursor.moveToFirst()) {

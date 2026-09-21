@@ -47,13 +47,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.notivault.app.data.local.entity.MediaEntity
 import com.notivault.app.ui.screens.chat.components.MessageBubble
+import com.notivault.app.ui.screens.media.components.MediaViewerModal
 import com.notivault.app.ui.theme.DarkBackground
 import com.notivault.app.ui.theme.DarkSurface
 import com.notivault.app.ui.theme.DeletedRed
 import com.notivault.app.ui.theme.TealSecondary
 import com.notivault.app.ui.theme.TextPrimaryDark
 import com.notivault.app.ui.theme.TextSecondaryDark
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,6 +72,7 @@ fun ChatDetailScreen(
     val listState = rememberLazyListState()
 
     var showMenu by remember { mutableStateOf(false) }
+    var viewingMedia by remember { mutableStateOf<MediaEntity?>(null) }
 
     LaunchedEffect(exportIntent) {
         exportIntent?.let { intent ->
@@ -213,10 +217,32 @@ fun ChatDetailScreen(
                     ) { message ->
                         MessageBubble(
                             message = message,
-                            isGroup = thread?.isGroup ?: false
+                            isGroup = thread?.isGroup ?: false,
+                            onMediaClick = { path ->
+                                viewingMedia = MediaEntity(
+                                    id = message.id,
+                                    threadId = message.threadId,
+                                    packageName = message.packageName,
+                                    originalPath = path,
+                                    internalSavedPath = path,
+                                    fileName = File(path).name,
+                                    mimeType = message.mediaMimeType ?: "image/jpeg",
+                                    fileSizeBytes = File(path).length(),
+                                    timestamp = message.timestamp,
+                                    mediaType = "IMAGE"
+                                )
+                            }
                         )
                     }
                 }
+            }
+
+            viewingMedia?.let { mediaItem ->
+                MediaViewerModal(
+                    media = mediaItem,
+                    onDismiss = { viewingMedia = null },
+                    onDelete = { viewingMedia = null }
+                )
             }
         }
     }

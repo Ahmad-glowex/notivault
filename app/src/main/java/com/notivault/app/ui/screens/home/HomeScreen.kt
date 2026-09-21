@@ -47,6 +47,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.notivault.app.ui.screens.home.components.AppFilterTabs
 import com.notivault.app.ui.screens.home.components.AppTab
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import com.notivault.app.service.media.MediaObserverService
 import com.notivault.app.ui.screens.home.components.ChatThreadItem
 import com.notivault.app.ui.screens.home.components.PermissionStatusBanner
 import com.notivault.app.ui.theme.DarkBackground
@@ -64,6 +72,7 @@ fun HomeScreen(
     onNavigateToSettings: () -> Unit,
     viewModel: HomeViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     val selectedTab by viewModel.selectedTab.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val threads by viewModel.threads.collectAsState()
@@ -71,8 +80,33 @@ fun HomeScreen(
     val deletedCount by viewModel.deletedCount.collectAsState()
     val mediaCount by viewModel.mediaCount.collectAsState()
 
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        MediaObserverService.start(context)
+    }
+
     LaunchedEffect(Unit) {
         viewModel.checkPermissionStatus()
+    }
+
+    LaunchedEffect(isPermissionGranted) {
+        if (isPermissionGranted) {
+            val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                arrayOf(
+                    android.Manifest.permission.READ_MEDIA_IMAGES,
+                    android.Manifest.permission.READ_MEDIA_VIDEO
+                )
+            } else {
+                arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
+            val needsPermission = permissions.any {
+                ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+            }
+            if (needsPermission) {
+                permissionLauncher.launch(permissions)
+            }
+        }
     }
 
     Scaffold(
@@ -143,12 +177,19 @@ fun HomeScreen(
                     .padding(horizontal = 16.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Deleted messages badge
+                // Deleted messages badge (clickable filter)
                 Row(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(DarkSurface)
+                        .background(if (searchQuery == "(Deleted)") DeletedRed.copy(alpha = 0.25f) else DarkSurface)
+                        .clickable {
+                            if (searchQuery == "(Deleted)") {
+                                viewModel.onSearchQueryChanged("")
+                            } else {
+                                viewModel.onSearchQueryChanged("(Deleted)")
+                            }
+                        }
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -167,12 +208,13 @@ fun HomeScreen(
                     )
                 }
 
-                // Cached media badge
+                // Cached media badge (clickable link to MediaGallery)
                 Row(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
                         .background(DarkSurface)
+                        .clickable { onNavigateToMedia() }
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {

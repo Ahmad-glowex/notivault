@@ -10,5 +10,8 @@ data class ParsedNotification(
     val isGroup: Boolean = false,
     val isDeletedNotice: Boolean = false,
     val hasMedia: Boolean = false,
-    val mediaType: String? = null
+    val mediaType: String? = null,
+    val mediaBitmap: android.graphics.Bitmap? = null,
+    val mediaIcon: android.graphics.drawable.Icon? = null,
+    val mediaDataUri: android.net.Uri? = null
 )

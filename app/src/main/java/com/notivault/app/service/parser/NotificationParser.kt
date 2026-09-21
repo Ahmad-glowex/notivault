@@ -1,6 +1,9 @@
 package com.notivault.app.service.parser
 
 import android.app.Notification
+import android.graphics.Bitmap
+import android.graphics.drawable.Icon
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.service.notification.StatusBarNotification
@@ -14,7 +17,7 @@ object NotificationParser {
     /**
      * Parses a StatusBarNotification into a list of one or more ParsedNotification items.
      * Extracts multi-message bundles via NotificationCompat.MessagingStyle, resolving
-     * individual senders, group conversation titles, and deleted message flags.
+     * individual senders, group conversation titles, deleted message flags, and media attachments.
      */
     fun parse(sbn: StatusBarNotification): List<ParsedNotification> {
         val notification = sbn.notification ?: return emptyList()
@@ -29,6 +32,9 @@ object NotificationParser {
         val conversationTitle = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()?.trim()
         val isGroupExtra = extras.getBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION, false) || !conversationTitle.isNullOrEmpty()
 
+        // Extract any notification-level media payload (e.g. BigPictureStyle picture, LargeIcon)
+        val (extraBitmap, extraIcon) = extractNotificationMedia(extras)
+
         // 1. First-class: AndroidX NotificationCompat.MessagingStyle extraction
         val messagingStyle = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
         if (messagingStyle != null && messagingStyle.messages.isNotEmpty()) {
@@ -36,9 +42,11 @@ object NotificationParser {
             val isGroup = messagingStyle.isGroupConversation || !styleTitle.isNullOrEmpty() || isGroupExtra
             val chatTitle = styleTitle ?: rawTitle.ifEmpty { "Chat" }
 
-            for (msg in messagingStyle.messages) {
+            val messages = messagingStyle.messages
+            for (i in messages.indices) {
+                val msg = messages[i]
                 val msgText = msg.text?.toString()?.trim() ?: ""
-                if (msgText.isBlank()) continue
+                if (msgText.isBlank() && msg.dataUri == null && extraBitmap == null) continue
 
                 val personName = msg.person?.name?.toString()?.trim()
                 @Suppress("DEPRECATION")
@@ -46,7 +54,7 @@ object NotificationParser {
                 val baseSender = personName ?: fallbackSender ?: (if (isGroup) "Member" else chatTitle)
 
                 val msgTimestamp = if (msg.timestamp > 0) msg.timestamp else postTime
-                val mediaUri = msg.dataUri?.toString()
+                val mediaUri = msg.dataUri
                 val mediaType = msg.dataMimeType
 
                 val isDeleted = DeletedMessageDetector.isDeletedNotification(msgText)
@@ -56,18 +64,28 @@ object NotificationParser {
                     baseSender
                 }
 
+                val isLatest = (i == messages.size - 1)
+                val isMediaText = isMediaIndicatingText(msgText)
+                val hasAttachedMedia = mediaUri != null || (isLatest && (extraBitmap != null || extraIcon != null || isMediaText))
+
+                val msgBitmap = if (isLatest) extraBitmap else null
+                val msgIcon = if (isLatest && msgBitmap == null) extraIcon else null
+
                 results.add(
                     ParsedNotification(
                         packageName = packageName,
                         chatTitle = chatTitle,
                         senderName = resolvedSender,
-                        messageText = msgText,
+                        messageText = msgText.ifEmpty { if (hasAttachedMedia) "📷 Sent a photo" else "" },
                         timestamp = msgTimestamp,
                         notificationKey = key,
                         isGroup = isGroup,
                         isDeletedNotice = isDeleted,
-                        hasMedia = mediaUri != null,
-                        mediaType = mediaType
+                        hasMedia = hasAttachedMedia,
+                        mediaType = mediaType ?: if (msgBitmap != null || msgIcon != null) "image/jpeg" else null,
+                        mediaBitmap = msgBitmap,
+                        mediaIcon = msgIcon,
+                        mediaDataUri = mediaUri
                     )
                 )
             }
@@ -80,12 +98,16 @@ object NotificationParser {
             if (messagesArray != null && messagesArray.isNotEmpty()) {
                 val chatTitle = conversationTitle ?: rawTitle.ifEmpty { "Chat" }
 
-                for (item in messagesArray) {
+                for (i in messagesArray.indices) {
+                    val item = messagesArray[i]
                     if (item is Bundle) {
                         val msgText = item.getCharSequence("text")?.toString()?.trim() ?: ""
-                        if (msgText.isBlank()) continue
+                        val mediaUriStr = item.getString("dataUri")
+                        val mediaUri = mediaUriStr?.let { Uri.parse(it) }
+                        val mediaType = item.getString("dataMimeType")
 
-                        // Android 9+ (API 28+) stores Person in KEY_SENDER_PERSON ("sender_person")
+                        if (msgText.isBlank() && mediaUri == null && extraBitmap == null) continue
+
                         val senderName = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                             @Suppress("DEPRECATION")
                             val person = item.getParcelable<android.app.Person>("sender_person")
@@ -98,8 +120,6 @@ object NotificationParser {
                         }
 
                         val msgTimestamp = item.getLong("time").takeIf { it > 0 } ?: postTime
-                        val mediaUri = item.getString("dataUri")
-                        val mediaType = item.getString("dataMimeType")
 
                         val isDeleted = DeletedMessageDetector.isDeletedNotification(msgText)
                         val resolvedSender = if (isDeleted) {
@@ -108,18 +128,28 @@ object NotificationParser {
                             senderName
                         }
 
+                        val isLatest = (i == messagesArray.size - 1)
+                        val isMediaText = isMediaIndicatingText(msgText)
+                        val hasAttachedMedia = mediaUri != null || (isLatest && (extraBitmap != null || extraIcon != null || isMediaText))
+
+                        val msgBitmap = if (isLatest) extraBitmap else null
+                        val msgIcon = if (isLatest && msgBitmap == null) extraIcon else null
+
                         results.add(
                             ParsedNotification(
                                 packageName = packageName,
                                 chatTitle = chatTitle,
                                 senderName = resolvedSender,
-                                messageText = msgText,
+                                messageText = msgText.ifEmpty { if (hasAttachedMedia) "📷 Sent a photo" else "" },
                                 timestamp = msgTimestamp,
                                 notificationKey = key,
                                 isGroup = isGroupExtra,
                                 isDeletedNotice = isDeleted,
-                                hasMedia = mediaUri != null,
-                                mediaType = mediaType
+                                hasMedia = hasAttachedMedia,
+                                mediaType = mediaType ?: if (msgBitmap != null || msgIcon != null) "image/jpeg" else null,
+                                mediaBitmap = msgBitmap,
+                                mediaIcon = msgIcon,
+                                mediaDataUri = mediaUri
                             )
                         )
                     }
@@ -133,7 +163,7 @@ object NotificationParser {
             val normalText = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.trim()
             val fallbackText = (bigText ?: normalText) ?: ""
 
-            if (fallbackText.isNotBlank()) {
+            if (fallbackText.isNotBlank() || extraBitmap != null || extraIcon != null) {
                 val (chatTitle, senderName, cleanText) = resolveTitleAndSender(
                     packageName = packageName,
                     rawTitle = rawTitle,
@@ -149,24 +179,99 @@ object NotificationParser {
                     senderName
                 }
 
+                val isMediaText = isMediaIndicatingText(cleanText)
+                val hasAttachedMedia = extraBitmap != null || extraIcon != null || isMediaText
+
                 results.add(
                     ParsedNotification(
                         packageName = packageName,
                         chatTitle = chatTitle,
                         senderName = resolvedSender,
-                        messageText = cleanText,
+                        messageText = cleanText.ifEmpty { if (hasAttachedMedia) "📷 Sent a photo" else "" },
                         timestamp = postTime,
                         notificationKey = key,
                         isGroup = isGroupExtra,
                         isDeletedNotice = isDeleted,
-                        hasMedia = false,
-                        mediaType = null
+                        hasMedia = hasAttachedMedia,
+                        mediaType = if (hasAttachedMedia) "image/jpeg" else null,
+                        mediaBitmap = extraBitmap,
+                        mediaIcon = extraIcon,
+                        mediaDataUri = null
                     )
                 )
             }
         }
 
         return results
+    }
+
+    private fun isMediaIndicatingText(text: String): Boolean {
+        val lower = text.lowercase()
+        return lower.contains("photo") ||
+                lower.contains("video") ||
+                lower.contains("audio") ||
+                lower.contains("voice message") ||
+                lower.contains("view once") ||
+                text.contains("📷") ||
+                text.contains("🎥") ||
+                text.contains("📸") ||
+                text.contains("🎬") ||
+                text.contains("🎤") ||
+                text.contains("ছবি") ||
+                text.contains("ভিডিও")
+    }
+
+    private fun extractNotificationMedia(extras: Bundle): Pair<Bitmap?, Icon?> {
+        var bitmap: Bitmap? = null
+        var icon: Icon? = null
+
+        // 1. Direct picture from BigPictureStyle
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            bitmap = extras.getParcelable(Notification.EXTRA_PICTURE, Bitmap::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            bitmap = extras.getParcelable(Notification.EXTRA_PICTURE) as? Bitmap
+        }
+
+        // 2. Icon from BigPictureStyle on API 31+
+        if (bitmap == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                icon = extras.getParcelable("android.pictureIcon", Icon::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                icon = extras.getParcelable("android.pictureIcon") as? Icon
+            }
+        }
+
+        // 3. Large Icon Big
+        if (bitmap == null && icon == null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                bitmap = extras.getParcelable(Notification.EXTRA_LARGE_ICON_BIG, Bitmap::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                bitmap = extras.getParcelable(Notification.EXTRA_LARGE_ICON_BIG) as? Bitmap
+            }
+        }
+
+        // 4. Fallback: inspect standard LARGE_ICON
+        if (bitmap == null && icon == null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                bitmap = extras.getParcelable(Notification.EXTRA_LARGE_ICON, Bitmap::class.java)
+                if (bitmap == null) {
+                    icon = extras.getParcelable(Notification.EXTRA_LARGE_ICON, Icon::class.java)
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                val largeObj = extras.get(Notification.EXTRA_LARGE_ICON)
+                if (largeObj is Bitmap) {
+                    bitmap = largeObj
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && largeObj is Icon) {
+                    icon = largeObj
+                }
+            }
+        }
+
+        return Pair(bitmap, icon)
     }
 
     /**

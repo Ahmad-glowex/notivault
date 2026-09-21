@@ -76,6 +76,23 @@ interface MessageDao {
     @Query("SELECT * FROM messages ORDER BY timestamp ASC")
     suspend fun getAllMessagesSync(): List<MessageEntity>
 
+    @Query("DELETE FROM messages WHERE threadId = :threadId")
+    suspend fun deleteMessagesForThread(threadId: String)
+
+    @Query("""
+        SELECT * FROM messages 
+        WHERE threadId = :threadId 
+          AND isDeleted = 0 
+          AND ABS(timestamp - :timestamp) <= :toleranceMs
+        ORDER BY ABS(timestamp - :timestamp) ASC 
+        LIMIT 1
+    """)
+    suspend fun getActiveMessageNearTimestamp(
+        threadId: String,
+        timestamp: Long,
+        toleranceMs: Long = 10000L
+    ): MessageEntity?
+
     @Query("DELETE FROM messages WHERE id = :id")
     suspend fun deleteMessage(id: Long)
 

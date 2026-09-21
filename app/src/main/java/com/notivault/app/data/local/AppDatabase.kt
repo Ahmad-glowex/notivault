@@ -26,7 +26,7 @@ import kotlinx.coroutines.launch
         MessageEntity::class,
         MediaEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

@@ -6,6 +6,7 @@ import android.util.Log
 import com.notivault.app.NotiVaultApp
 import com.notivault.app.data.local.entity.AppEntity
 import com.notivault.app.service.parser.NotificationParser
+import com.notivault.app.service.media.MediaCacheManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -15,6 +16,7 @@ import kotlinx.coroutines.launch
 class NotiVaultListenerService : NotificationListenerService() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val cacheManager by lazy { MediaCacheManager(this) }
 
     companion object {
         private const val TAG = "NotiVaultListener"
@@ -59,6 +61,78 @@ class NotiVaultListenerService : NotificationListenerService() {
                         )
                         Log.d(TAG, "Marked previous message as deleted: $marked")
                     } else {
+                        var savedMediaUri: String? = null
+                        var hasMedia = item.hasMedia
+
+                        try {
+                            if (item.mediaBitmap != null) {
+                                val cachedFile = cacheManager.cacheBitmap(
+                                    item.mediaBitmap,
+                                    prefix = item.packageName.replace(".", "_")
+                                )
+                                if (cachedFile != null) {
+                                    savedMediaUri = cachedFile.absolutePath
+                                    hasMedia = true
+                                    app.mediaRepository.saveCachedMedia(
+                                        packageName = item.packageName,
+                                        originalPath = "notification_${item.notificationKey}_${item.timestamp}",
+                                        internalSavedPath = cachedFile.absolutePath,
+                                        fileName = cachedFile.name,
+                                        mimeType = "image/jpeg",
+                                        fileSizeBytes = cachedFile.length(),
+                                        mediaType = "IMAGE",
+                                        threadId = "${item.packageName}_${item.chatTitle.trim()}"
+                                    )
+                                }
+                            } else if (item.mediaIcon != null) {
+                                val cachedFile = cacheManager.cacheIcon(
+                                    item.mediaIcon,
+                                    prefix = item.packageName.replace(".", "_")
+                                )
+                                if (cachedFile != null) {
+                                    savedMediaUri = cachedFile.absolutePath
+                                    hasMedia = true
+                                    app.mediaRepository.saveCachedMedia(
+                                        packageName = item.packageName,
+                                        originalPath = "notification_${item.notificationKey}_${item.timestamp}",
+                                        internalSavedPath = cachedFile.absolutePath,
+                                        fileName = cachedFile.name,
+                                        mimeType = "image/jpeg",
+                                        fileSizeBytes = cachedFile.length(),
+                                        mediaType = "IMAGE",
+                                        threadId = "${item.packageName}_${item.chatTitle.trim()}"
+                                    )
+                                }
+                            } else if (item.mediaDataUri != null) {
+                                val cachedFile = cacheManager.cacheContentUri(
+                                    item.mediaDataUri,
+                                    item.mediaType,
+                                    prefix = item.packageName.replace(".", "_")
+                                )
+                                if (cachedFile != null) {
+                                    savedMediaUri = cachedFile.absolutePath
+                                    hasMedia = true
+                                    val mType = when {
+                                        item.mediaType?.startsWith("video") == true -> "VIDEO"
+                                        item.mediaType?.startsWith("audio") == true -> "AUDIO"
+                                        else -> "IMAGE"
+                                    }
+                                    app.mediaRepository.saveCachedMedia(
+                                        packageName = item.packageName,
+                                        originalPath = item.mediaDataUri.toString(),
+                                        internalSavedPath = cachedFile.absolutePath,
+                                        fileName = cachedFile.name,
+                                        mimeType = item.mediaType ?: "image/jpeg",
+                                        fileSizeBytes = cachedFile.length(),
+                                        mediaType = mType,
+                                        threadId = "${item.packageName}_${item.chatTitle.trim()}"
+                                    )
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error caching media payload from notification", e)
+                        }
+
                         app.messageRepository.saveIncomingNotification(
                             packageName = item.packageName,
                             chatTitle = item.chatTitle,
@@ -67,8 +141,8 @@ class NotiVaultListenerService : NotificationListenerService() {
                             timestamp = item.timestamp,
                             notificationKey = item.notificationKey,
                             isGroup = item.isGroup,
-                            hasMedia = item.hasMedia,
-                            mediaUri = null
+                            hasMedia = hasMedia,
+                            mediaUri = savedMediaUri
                         )
                     }
                 }

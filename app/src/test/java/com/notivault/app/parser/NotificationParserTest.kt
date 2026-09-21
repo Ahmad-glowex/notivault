@@ -82,4 +82,34 @@ class NotificationParserTest {
         assertEquals("Alice", senderName)
         assertEquals("Update: Meeting moved to 4:00 PM: urgent", text)
     }
+
+    @Test
+    fun testMediaIndicatingTextResolution() {
+        val (chatTitle, senderName, text) = NotificationParser.resolveTitleAndSender(
+            packageName = "com.whatsapp",
+            rawTitle = "Ahmad",
+            text = "📷 Sent a photo",
+            conversationTitle = null,
+            isGroup = false
+        )
+
+        assertEquals("Ahmad", chatTitle)
+        assertEquals("Ahmad", senderName)
+        assertEquals("📷 Sent a photo", text)
+    }
+
+    @Test
+    fun testBengaliSenderTitleResolution() {
+        val (chatTitle, senderName, text) = NotificationParser.resolveTitleAndSender(
+            packageName = "com.whatsapp",
+            rawTitle = "আহমদ",
+            text = "কেমন আছেন?",
+            conversationTitle = null,
+            isGroup = false
+        )
+
+        assertEquals("আহমদ", chatTitle)
+        assertEquals("আহমদ", senderName)
+        assertEquals("কেমন আছেন?", text)
+    }
 }

@@ -62,6 +62,12 @@ class MessageRepositoryImpl(
         val resolvedSender = senderName.trim().ifEmpty { cleanTitle }
         val threadId = "${packageName}_$cleanTitle"
 
+        // Safeguard: If message text indicates deletion, route to markDeletedBySender
+        if (com.notivault.app.service.engine.DeletedMessageDetector.isDeletedNotification(messageText)) {
+            markDeletedBySender(packageName, cleanTitle, resolvedSender, timestamp)
+            return@withContext 0L
+        }
+
         // Deduplication: Check if this exact message has already been captured
         val existingMsg = messageDao.findExistingMessage(
             threadId = threadId,
@@ -100,7 +106,7 @@ class MessageRepositoryImpl(
             originalNotificationKey = notificationKey,
             hasMedia = hasMedia,
             mediaUri = mediaUri,
-            mediaMimeType = null,
+            mediaMimeType = if (hasMedia) "image/jpeg" else null,
             isSelf = false
         )
         val msgId = messageDao.insertMessage(messageEntity)
@@ -117,13 +123,22 @@ class MessageRepositoryImpl(
         senderName: String,
         timestamp: Long
     ): Boolean = withContext(Dispatchers.IO) {
-        val cleanTitle = chatTitle.trim().ifEmpty { senderName.trim() }
+        val cleanTitle = chatTitle.trim().ifEmpty { senderName.trim().ifEmpty { "Unknown" } }
+        val resolvedSender = senderName.trim().ifEmpty { cleanTitle }
         val threadId = "${packageName}_$cleanTitle"
 
-        // Try exact sender match first
-        var targetMessage = messageDao.getLatestActiveMessageBySender(threadId, senderName)
+        // 1. Try matching active message near the deletion timestamp (within 10s)
+        var targetMessage = if (timestamp > 0) {
+            messageDao.getActiveMessageNearTimestamp(threadId, timestamp, toleranceMs = 10000L)
+        } else null
+
+        // 2. Fallback to latest active message by this sender
         if (targetMessage == null) {
-            // Fallback to latest active in thread
+            targetMessage = messageDao.getLatestActiveMessageBySender(threadId, resolvedSender)
+        }
+
+        // 3. Fallback to latest active message in thread
+        if (targetMessage == null) {
             targetMessage = messageDao.getLatestActiveMessageInThread(threadId)
         }
 
@@ -141,9 +156,37 @@ class MessageRepositoryImpl(
                 )
             }
             return@withContext true
-        }
+        } else {
+            // Original message was not cached beforehand (e.g. sender unsent immediately).
+            // Preserve a tombstone record so user sees deletion occurred.
+            val existingThread = chatDao.getThreadSync(threadId)
+            val updatedThread = ChatThreadEntity(
+                threadId = threadId,
+                packageName = packageName,
+                chatTitle = cleanTitle,
+                isGroup = false,
+                lastMessageText = "Deleted message preserved",
+                lastMessageTimestamp = timestamp,
+                unreadCount = (existingThread?.unreadCount ?: 0) + 1,
+                isPinned = existingThread?.isPinned ?: false,
+                isMuted = existingThread?.isMuted ?: false
+            )
+            chatDao.insertOrUpdateThread(updatedThread)
 
-        false
+            messageDao.insertMessage(
+                MessageEntity(
+                    threadId = threadId,
+                    packageName = packageName,
+                    senderName = resolvedSender,
+                    messageText = "This message was deleted before capture",
+                    timestamp = timestamp,
+                    isDeleted = true,
+                    deletedTimestamp = timestamp,
+                    isSelf = false
+                )
+            )
+            return@withContext true
+        }
     }
 
     override suspend fun setThreadPinned(threadId: String, isPinned: Boolean) =
@@ -152,6 +195,7 @@ class MessageRepositoryImpl(
         }
 
     override suspend fun deleteThread(threadId: String) = withContext(Dispatchers.IO) {
+        messageDao.deleteMessagesForThread(threadId)
         chatDao.deleteThread(threadId)
     }
 
