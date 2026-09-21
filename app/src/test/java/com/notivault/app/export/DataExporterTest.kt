@@ -24,5 +24,9 @@ class DataExporterTest {
         val newlineText = "Line 1\nLine 2\rLine 3"
         val escaped3 = method.invoke(DataExporter, newlineText) as String
         assertEquals("\"Line 1 Line 2 Line 3\"", escaped3)
+
+        val crlfText = "Line 1\r\nLine 2"
+        val escaped4 = method.invoke(DataExporter, crlfText) as String
+        assertEquals("\"Line 1 Line 2\"", escaped4)
     }
 }

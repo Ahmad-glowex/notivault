@@ -41,7 +41,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         Pair(tab, query)
     }.flatMapLatest { (tab, query) ->
         val flow = if (query.isNotBlank()) {
-            messageRepo.searchThreads(query)
+            messageRepo.searchThreads(query, tab.packageName)
         } else if (tab.packageName != null) {
             messageRepo.getThreadsByPackage(tab.packageName)
         } else {

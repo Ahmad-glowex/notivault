@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PermMedia
@@ -42,6 +43,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -72,6 +74,14 @@ fun SettingsScreen(
     val isSecureWindowEnabled by viewModel.isSecureWindowEnabled.collectAsState()
     val monitoredApps by viewModel.monitoredApps.collectAsState()
     val isNotificationAccess = isNotificationAccessGranted(context)
+    val exportIntent by viewModel.exportIntent.collectAsState()
+
+    LaunchedEffect(exportIntent) {
+        exportIntent?.let { intent ->
+            context.startActivity(intent)
+            viewModel.clearExportIntent()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -303,7 +313,59 @@ fun SettingsScreen(
                 }
             }
 
-            // Section 5: Data Management & Wipe
+            // Section 5: Data Export & Backup
+            Card(
+                colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.FileDownload,
+                            contentDescription = null,
+                            tint = TealSecondary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Export Vault Data",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = TextPrimaryDark,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Export all intercepted messages and deleted logs to local JSON or CSV format.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondaryDark
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { viewModel.exportAllToJson(context) },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Export JSON")
+                        }
+
+                        OutlinedButton(
+                            onClick = { viewModel.exportAllToCsv(context) },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Export CSV")
+                        }
+                    }
+                }
+            }
+
+            // Section 6: Data Management & Wipe
             Card(
                 colors = CardDefaults.cardColors(containerColor = DarkSurface),
                 shape = RoundedCornerShape(12.dp)

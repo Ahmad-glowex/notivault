@@ -52,4 +52,34 @@ class NotificationParserTest {
         assertEquals("Mark", senderName)
         assertEquals("Let's meet at 5 PM", text)
     }
+
+    @Test
+    fun testGroupChatWithParenthesesInTitle() {
+        val (chatTitle, senderName, text) = NotificationParser.resolveTitleAndSender(
+            packageName = "com.whatsapp",
+            rawTitle = "Family Chat (Mom)",
+            text = "Dinner is ready",
+            conversationTitle = null,
+            isGroup = true
+        )
+
+        assertEquals("Family Chat", chatTitle)
+        assertEquals("Mom", senderName)
+        assertEquals("Dinner is ready", text)
+    }
+
+    @Test
+    fun testMultipleColonsInMessage() {
+        val (chatTitle, senderName, text) = NotificationParser.resolveTitleAndSender(
+            packageName = "com.whatsapp",
+            rawTitle = "Project Alpha",
+            text = "Alice: Update: Meeting moved to 4:00 PM: urgent",
+            conversationTitle = "Project Alpha",
+            isGroup = true
+        )
+
+        assertEquals("Project Alpha", chatTitle)
+        assertEquals("Alice", senderName)
+        assertEquals("Update: Meeting moved to 4:00 PM: urgent", text)
+    }
 }

@@ -27,6 +27,10 @@ class MediaRepositoryImpl(
         mediaDao.getMediaById(id)
     }
 
+    override suspend fun getMediaByOriginalPath(originalPath: String): MediaEntity? = withContext(Dispatchers.IO) {
+        mediaDao.getMediaByOriginalPath(originalPath)
+    }
+
     override suspend fun saveCachedMedia(
         packageName: String,
         originalPath: String,
@@ -41,6 +45,12 @@ class MediaRepositoryImpl(
         // Prevent duplicate media entries
         val existing = mediaDao.getMediaByOriginalPath(originalPath)
         if (existing != null) {
+            // Delete freshly created duplicate file to avoid disk leak
+            if (internalSavedPath != existing.internalSavedPath) {
+                try {
+                    File(internalSavedPath).delete()
+                } catch (_: Exception) {}
+            }
             return@withContext existing.id
         }
 

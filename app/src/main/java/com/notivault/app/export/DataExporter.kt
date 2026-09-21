@@ -82,15 +82,33 @@ object DataExporter {
         file
     }
 
+    suspend fun exportAllToJson(
+        context: Context,
+        messages: List<MessageEntity>
+    ): File = withContext(Dispatchers.IO) {
+        exportToJson(context, "Full_Vault_Export", messages)
+    }
+
+    suspend fun exportAllToCsv(
+        context: Context,
+        messages: List<MessageEntity>
+    ): File = withContext(Dispatchers.IO) {
+        exportToCsv(context, "Full_Vault_Export", messages)
+    }
+
     fun getShareIntent(context: Context, file: File, mimeType: String): Intent {
         val uri: Uri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileprovider",
             file
         )
-        return Intent(Intent.ACTION_SEND).apply {
+        val sendIntent = Intent(Intent.ACTION_SEND).apply {
             type = mimeType
             putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        return Intent.createChooser(sendIntent, "Export NotiVault Data").apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
     }

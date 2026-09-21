@@ -9,6 +9,7 @@ interface MediaRepository {
     fun getMediaForThread(threadId: String): Flow<List<MediaEntity>>
     fun getMediaCount(): Flow<Int>
     suspend fun getMediaById(id: Long): MediaEntity?
+    suspend fun getMediaByOriginalPath(originalPath: String): MediaEntity?
     suspend fun saveCachedMedia(
         packageName: String,
         originalPath: String,

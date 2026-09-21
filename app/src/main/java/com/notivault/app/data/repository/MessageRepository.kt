@@ -10,11 +10,12 @@ interface MessageRepository {
     fun getThreadsByPackage(packageName: String): Flow<List<ChatThreadEntity>>
     fun getThread(threadId: String): Flow<ChatThreadEntity?>
     fun getMessagesForThread(threadId: String): Flow<List<MessageEntity>>
-    fun searchThreads(query: String): Flow<List<ChatThreadEntity>>
+    fun searchThreads(query: String, packageName: String? = null): Flow<List<ChatThreadEntity>>
     fun searchMessages(query: String): Flow<List<MessageEntity>>
     fun getMonitoredApps(): Flow<List<AppEntity>>
     fun getDeletedMessagesCount(): Flow<Int>
     fun getAllDeletedMessages(): Flow<List<MessageEntity>>
+    suspend fun getAllMessages(): List<MessageEntity>
 
     suspend fun saveIncomingNotification(
         packageName: String,

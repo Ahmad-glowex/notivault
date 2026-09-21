@@ -8,26 +8,34 @@ import re
 import unittest
 
 DELETED_PATTERNS = [
-    re.compile(r".*this message was deleted.*", re.IGNORECASE),
-    re.compile(r".*you deleted this message.*", re.IGNORECASE),
-    re.compile(r".*this message was deleted by the author.*", re.IGNORECASE),
-    re.compile(r".*unsent a message.*", re.IGNORECASE),
-    re.compile(r".*message was unsent.*", re.IGNORECASE),
-    re.compile(r".*message deleted.*", re.IGNORECASE),
-    re.compile(r".*message was removed.*", re.IGNORECASE),
-    re.compile(r".*este mensaje fue eliminado.*", re.IGNORECASE),
-    re.compile(r".*eliminó un mensaje.*", re.IGNORECASE),
-    re.compile(r".*esta mensagem foi apagada.*", re.IGNORECASE),
-    re.compile(r".*anulou o envio de uma mensagem.*", re.IGNORECASE),
-    re.compile(r".*ce message a été supprimé.*", re.IGNORECASE),
-    re.compile(r".*a annulé l'envoi d'un message.*", re.IGNORECASE),
-    re.compile(r".*diese nachricht wurde gelöscht.*", re.IGNORECASE),
-    re.compile(r".*hat eine nachricht zurückgerufen.*", re.IGNORECASE),
-    re.compile(r".*यह संदेश हटा दिया गया था.*", re.IGNORECASE),
-    re.compile(r".*বার্তাটি মুছে ফেলা হয়েছে.*", re.IGNORECASE),
+    # English
+    re.compile(r"^(?:[\w\s]+:\s+)?(?:This message was deleted|You deleted this message|This message was deleted by (?:the author|an admin)|(?:.+?\s+)?unsent a message|Message was unsent|Message deleted|Message was removed)[.!]?$", re.IGNORECASE),
+    # Spanish
+    re.compile(r"^(?:[\w\s]+:\s+)?(?:Este mensaje fue eliminado|Se eliminó este mensaje|Eliminaste este mensaje|.+?\s+eliminó un mensaje)[.!]?$", re.IGNORECASE),
+    # Portuguese
+    re.compile(r"^(?:[\w\s]+:\s+)?(?:Esta mensagem foi apagada|Você apagou esta mensagem|.+?\s+anulou o envio de uma mensagem)[.!]?$", re.IGNORECASE),
+    # French
+    re.compile(r"^(?:[\w\s]+:\s+)?(?:Ce message a été supprimé|Vous avez supprimé ce message|.+?\s+a annulé l'envoi d'un message)[.!]?$", re.IGNORECASE),
+    # German
+    re.compile(r"^(?:[\w\s]+:\s+)?(?:Diese Nachricht wurde gelöscht|Du hast diese Nachricht gelöscht|.+?\s+hat eine Nachricht zurückgerufen)[.!]?$", re.IGNORECASE),
+    # Hindi
+    re.compile(r"^(?:.+?:\s+)?(?:(?:यह\s+)?संदेश हटा दिया गया(?: था)?)[.!]?$", re.IGNORECASE),
+    # Bengali
+    re.compile(r"^(?:.+?:\s+)?(?:(?:এই\s+)?বার্তাটি মুছে ফেলা হয়েছে)[.!]?$", re.IGNORECASE),
 ]
 
-MESSENGER_UNSENT_PATTERN = re.compile(r"^(.*)\s+unsent a message$", re.IGNORECASE)
+UNSENT_AUTHOR_PATTERNS = [
+    re.compile(r"^(?:(.+?)\s+unsent a message)[.!]?$", re.IGNORECASE),
+    re.compile(r"^(?:(.+?)\s+a annulé l'envoi d'un message)[.!]?$", re.IGNORECASE),
+    re.compile(r"^(?:(.+?)\s+eliminó un mensaje)[.!]?$", re.IGNORECASE),
+    re.compile(r"^(?:(.+?)\s+anulou o envio de uma mensagem)[.!]?$", re.IGNORECASE),
+    re.compile(r"^(?:(.+?)\s+hat eine Nachricht zurückgerufen)[.!]?$", re.IGNORECASE),
+    re.compile(r"^([^:]+):\s+(?:This message was deleted|You deleted this message|Message deleted|Este mensaje|Esta mensagem|Ce message|Diese Nachricht)[.!]?$", re.IGNORECASE)
+]
+
+SELF_PRONOUNS = {"you", "vous", "tú", "tu", "você", "voce", "du"}
+
+GROUP_TITLE_SENDER_PATTERN = re.compile(r"^(.+?)\s*\((.+?)\)$")
 
 def is_deleted_notification(text: str | None) -> bool:
     if not text or not text.strip():
@@ -36,13 +44,15 @@ def is_deleted_notification(text: str | None) -> bool:
     return any(p.match(clean) is not None for p in DELETED_PATTERNS)
 
 def extract_unsent_author(text: str | None, fallback: str) -> str:
-    if not text:
+    if not text or not text.strip():
         return fallback
-    m = MESSENGER_UNSENT_PATTERN.match(text.strip())
-    if m:
-        extracted = m.group(1).strip()
-        if extracted and extracted.lower() != "you":
-            return extracted
+    clean = text.strip()
+    for pattern in UNSENT_AUTHOR_PATTERNS:
+        m = pattern.match(clean)
+        if m:
+            extracted = m.group(1).strip()
+            if extracted and extracted.lower() not in SELF_PRONOUNS:
+                return extracted
     return fallback
 
 def resolve_title_and_sender(pkg: str, raw_title: str, text: str, conv_title: str | None, is_group: bool):
@@ -59,7 +69,12 @@ def resolve_title_and_sender(pkg: str, raw_title: str, text: str, conv_title: st
             sender_name = raw_title.strip() or chat_title
             msg_text = text
     else:
-        if is_group and ": " in text:
+        group_match = GROUP_TITLE_SENDER_PATTERN.match(raw_title.strip())
+        if group_match:
+            chat_title = group_match.group(1).strip()
+            sender_name = group_match.group(2).strip()
+            msg_text = text
+        elif is_group and ": " in text:
             parts = text.split(": ", 1)
             chat_title = raw_title.strip() or "Group Chat"
             sender_name = parts[0].strip()
@@ -80,27 +95,46 @@ class TestNotiVaultAlgorithms(unittest.TestCase):
     def test_whatsapp_detection(self):
         self.assertTrue(is_deleted_notification("This message was deleted"))
         self.assertTrue(is_deleted_notification("this message was deleted"))
+        self.assertTrue(is_deleted_notification("This message was deleted."))
         self.assertTrue(is_deleted_notification("You deleted this message"))
         self.assertTrue(is_deleted_notification("This message was deleted by the author"))
+        self.assertTrue(is_deleted_notification("This message was deleted by an admin"))
         self.assertTrue(is_deleted_notification("Message deleted"))
+        self.assertTrue(is_deleted_notification("Message was removed."))
+        self.assertTrue(is_deleted_notification("Alice: This message was deleted"))
 
     def test_multilingual_detection(self):
         self.assertTrue(is_deleted_notification("Este mensaje fue eliminado"))
         self.assertTrue(is_deleted_notification("Esta mensagem foi apagada"))
+        self.assertTrue(is_deleted_notification("Juan: Este mensaje fue eliminado"))
         self.assertTrue(is_deleted_notification("Ce message a été supprimé"))
+        self.assertTrue(is_deleted_notification("Claire: Ce message a été supprimé."))
         self.assertTrue(is_deleted_notification("Diese Nachricht wurde gelöscht"))
         self.assertTrue(is_deleted_notification("বার্তাটি মুছে ফেলা হয়েছে"))
+        self.assertTrue(is_deleted_notification("यह संदेश हटा दिया गया था"))
 
     def test_messenger_detection_and_author_extraction(self):
         self.assertTrue(is_deleted_notification("You unsent a message"))
+        self.assertTrue(is_deleted_notification("You unsent a message."))
         self.assertTrue(is_deleted_notification("Alice unsent a message"))
+        self.assertTrue(is_deleted_notification("Alice unsent a message."))
         self.assertEqual(extract_unsent_author("Alice unsent a message", "Default"), "Alice")
+        self.assertEqual(extract_unsent_author("Alice unsent a message.", "Default"), "Alice")
+        self.assertEqual(extract_unsent_author("Bob: This message was deleted", "Default"), "Bob")
         self.assertEqual(extract_unsent_author("You unsent a message", "Default"), "Default")
+        self.assertEqual(extract_unsent_author("You unsent a message.", "Default"), "Default")
 
     def test_non_deleted_messages(self):
+        # Critical negative test cases
         self.assertFalse(is_deleted_notification("Hey there, how are you doing?"))
+        self.assertFalse(is_deleted_notification("Why was the message deleted?"))
+        self.assertFalse(is_deleted_notification("Did you see that the message deleted by John?"))
+        self.assertFalse(is_deleted_notification("Alice unsent a message yesterday when we were arguing"))
+        self.assertFalse(is_deleted_notification("Can you check if that message was removed from the chat?"))
         self.assertFalse(is_deleted_notification("I deleted the old repo yesterday"))
+        self.assertFalse(is_deleted_notification("Send me the message"))
         self.assertFalse(is_deleted_notification(""))
+        self.assertFalse(is_deleted_notification("   "))
         self.assertFalse(is_deleted_notification(None))
 
     def test_notification_parser_direct_message(self):
@@ -120,6 +154,12 @@ class TestNotiVaultAlgorithms(unittest.TestCase):
         self.assertEqual(title, "Alpha Team")
         self.assertEqual(sender, "Alice")
         self.assertEqual(text, "Note: Meeting at 3pm: urgent")
+
+    def test_notification_parser_group_parentheses(self):
+        title, sender, text = resolve_title_and_sender("com.whatsapp", "Family Chat (Mom)", "Dinner is ready", None, True)
+        self.assertEqual(title, "Family Chat")
+        self.assertEqual(sender, "Mom")
+        self.assertEqual(text, "Dinner is ready")
 
     def test_hindi_bengali_deleted(self):
         self.assertTrue(is_deleted_notification("এই বার্তাটি মুছে ফেলা হয়েছে"))

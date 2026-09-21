@@ -10,8 +10,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Audiotrack
-import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -58,7 +58,7 @@ fun MediaGridItem(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = if (media.mediaType == "AUDIO") Icons.Default.Audiotrack else Icons.Default.InsertDriveFile,
+                    imageVector = if (media.mediaType == "AUDIO") Icons.Default.Audiotrack else Icons.AutoMirrored.Filled.InsertDriveFile,
                     contentDescription = null,
                     tint = Color.White,
                     modifier = Modifier.size(36.dp)

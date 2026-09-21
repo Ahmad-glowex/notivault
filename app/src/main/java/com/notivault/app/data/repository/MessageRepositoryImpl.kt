@@ -26,8 +26,12 @@ class MessageRepositoryImpl(
     override fun getMessagesForThread(threadId: String): Flow<List<MessageEntity>> =
         messageDao.getMessagesForThread(threadId)
 
-    override fun searchThreads(query: String): Flow<List<ChatThreadEntity>> =
-        chatDao.searchThreads(query)
+    override fun searchThreads(query: String, packageName: String?): Flow<List<ChatThreadEntity>> =
+        if (packageName != null) {
+            chatDao.searchThreadsByPackage(packageName, query)
+        } else {
+            chatDao.searchThreads(query)
+        }
 
     override fun searchMessages(query: String): Flow<List<MessageEntity>> =
         messageDao.searchMessages(query)
@@ -38,6 +42,10 @@ class MessageRepositoryImpl(
 
     override fun getAllDeletedMessages(): Flow<List<MessageEntity>> =
         messageDao.getAllDeletedMessages()
+
+    override suspend fun getAllMessages(): List<MessageEntity> = withContext(Dispatchers.IO) {
+        messageDao.getAllMessagesSync()
+    }
 
     override suspend fun saveIncomingNotification(
         packageName: String,
@@ -51,7 +59,19 @@ class MessageRepositoryImpl(
         mediaUri: String?
     ): Long = withContext(Dispatchers.IO) {
         val cleanTitle = chatTitle.trim().ifEmpty { senderName.trim().ifEmpty { "Unknown" } }
+        val resolvedSender = senderName.trim().ifEmpty { cleanTitle }
         val threadId = "${packageName}_$cleanTitle"
+
+        // Deduplication: Check if this exact message has already been captured
+        val existingMsg = messageDao.findExistingMessage(
+            threadId = threadId,
+            senderName = resolvedSender,
+            messageText = messageText,
+            timestamp = timestamp
+        )
+        if (existingMsg != null) {
+            return@withContext existingMsg.id
+        }
 
         // Update or insert thread
         val existingThread = chatDao.getThreadSync(threadId)
@@ -72,7 +92,7 @@ class MessageRepositoryImpl(
         val messageEntity = MessageEntity(
             threadId = threadId,
             packageName = packageName,
-            senderName = senderName.trim().ifEmpty { cleanTitle },
+            senderName = resolvedSender,
             messageText = messageText,
             timestamp = timestamp,
             isDeleted = false,
@@ -109,6 +129,17 @@ class MessageRepositoryImpl(
 
         if (targetMessage != null) {
             messageDao.markMessageAsDeleted(targetMessage.id, timestamp)
+
+            // Update thread last message preview if this was the latest message
+            val currentThread = chatDao.getThreadSync(threadId)
+            if (currentThread != null && currentThread.lastMessageTimestamp <= targetMessage.timestamp) {
+                chatDao.insertOrUpdateThread(
+                    currentThread.copy(
+                        lastMessageText = "${targetMessage.messageText} (Deleted)",
+                        lastMessageTimestamp = timestamp
+                    )
+                )
+            }
             return@withContext true
         }
 

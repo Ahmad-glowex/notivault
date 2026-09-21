@@ -11,11 +11,20 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+import android.content.Context
+import android.content.Intent
+import com.notivault.app.export.DataExporter
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val app = application as NotiVaultApp
     private val settingsRepo = app.settingsRepository
     private val messageRepo = app.messageRepository
+
+    private val _exportIntent = MutableStateFlow<Intent?>(null)
+    val exportIntent: StateFlow<Intent?> = _exportIntent.asStateFlow()
 
     val isBiometricLockEnabled: StateFlow<Boolean> = settingsRepo.isBiometricLockEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
@@ -50,6 +59,26 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             messageRepo.setAppMonitoring(packageName, enabled)
         }
+    }
+
+    fun exportAllToJson(context: Context) {
+        viewModelScope.launch {
+            val allMessages = messageRepo.getAllMessages()
+            val file = DataExporter.exportAllToJson(context, allMessages)
+            _exportIntent.value = DataExporter.getShareIntent(context, file, "application/json")
+        }
+    }
+
+    fun exportAllToCsv(context: Context) {
+        viewModelScope.launch {
+            val allMessages = messageRepo.getAllMessages()
+            val file = DataExporter.exportAllToCsv(context, allMessages)
+            _exportIntent.value = DataExporter.getShareIntent(context, file, "text/csv")
+        }
+    }
+
+    fun clearExportIntent() {
+        _exportIntent.value = null
     }
 
     fun clearDeletedMessages() {

@@ -119,6 +119,11 @@ class MediaObserverService : Service() {
     private fun handleNewMediaFile(file: File, packageName: String) {
         serviceScope.launch {
             val app = application as? NotiVaultApp ?: return@launch
+
+            // Check if already backed up before writing a new copy to disk
+            val existing = app.mediaRepository.getMediaByOriginalPath(file.absolutePath)
+            if (existing != null) return@launch
+
             val cachedFile = cacheManager.cacheLocalFile(file, prefix = packageName.replace(".", "_"))
             if (cachedFile != null) {
                 val mediaType = when {
@@ -144,6 +149,11 @@ class MediaObserverService : Service() {
     private fun handleMediaStoreChange(uri: Uri, name: String, mime: String) {
         serviceScope.launch {
             val app = application as? NotiVaultApp ?: return@launch
+
+            // Check if already backed up before writing a new copy to disk
+            val existing = app.mediaRepository.getMediaByOriginalPath(uri.toString())
+            if (existing != null) return@launch
+
             val cachedFile = cacheManager.cacheContentUri(uri, mime, prefix = "mediastore")
             if (cachedFile != null) {
                 val mediaType = if (mime.startsWith("video")) "VIDEO" else "IMAGE"

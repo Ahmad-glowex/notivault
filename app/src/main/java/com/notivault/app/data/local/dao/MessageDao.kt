@@ -58,6 +58,24 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE isDeleted = 1 ORDER BY deletedTimestamp DESC")
     fun getAllDeletedMessages(): Flow<List<MessageEntity>>
 
+    @Query("""
+        SELECT * FROM messages 
+        WHERE threadId = :threadId 
+          AND senderName = :senderName 
+          AND messageText = :messageText 
+          AND timestamp = :timestamp 
+        LIMIT 1
+    """)
+    suspend fun findExistingMessage(
+        threadId: String,
+        senderName: String,
+        messageText: String,
+        timestamp: Long
+    ): MessageEntity?
+
+    @Query("SELECT * FROM messages ORDER BY timestamp ASC")
+    suspend fun getAllMessagesSync(): List<MessageEntity>
+
     @Query("DELETE FROM messages WHERE id = :id")
     suspend fun deleteMessage(id: Long)
 

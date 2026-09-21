@@ -32,6 +32,14 @@ interface ChatDao {
     """)
     fun searchThreads(query: String): Flow<List<ChatThreadEntity>>
 
+    @Query("""
+        SELECT * FROM chat_threads 
+        WHERE packageName = :packageName 
+          AND (chatTitle LIKE '%' || :query || '%' OR lastMessageText LIKE '%' || :query || '%')
+        ORDER BY lastMessageTimestamp DESC
+    """)
+    fun searchThreadsByPackage(packageName: String, query: String): Flow<List<ChatThreadEntity>>
+
     @Query("UPDATE chat_threads SET isPinned = :isPinned WHERE threadId = :threadId")
     suspend fun setPinned(threadId: String, isPinned: Boolean)
 

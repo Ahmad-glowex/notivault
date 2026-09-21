@@ -23,21 +23,27 @@ class MediaStoreObserver(
             val projection = arrayOf(
                 MediaStore.MediaColumns._ID,
                 MediaStore.MediaColumns.DISPLAY_NAME,
-                MediaStore.MediaColumns.MIME_TYPE,
-                MediaStore.MediaColumns.DATA
+                MediaStore.MediaColumns.MIME_TYPE
             )
 
-            contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+            val isItemUri = uri.lastPathSegment?.toLongOrNull() != null
+            val sortOrder = if (isItemUri) null else "${MediaStore.MediaColumns.DATE_ADDED} DESC LIMIT 1"
+
+            contentResolver.query(uri, projection, null, null, sortOrder)?.use { cursor ->
                 if (cursor.moveToFirst()) {
                     val nameIdx = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME)
                     val mimeIdx = cursor.getColumnIndex(MediaStore.MediaColumns.MIME_TYPE)
-                    val dataIdx = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
+                    val idIdx = cursor.getColumnIndex(MediaStore.MediaColumns._ID)
 
                     val name = if (nameIdx >= 0) cursor.getString(nameIdx) ?: "unknown" else "unknown"
                     val mime = if (mimeIdx >= 0) cursor.getString(mimeIdx) ?: "image/jpeg" else "image/jpeg"
-                    val path = if (dataIdx >= 0) cursor.getString(dataIdx) ?: "" else ""
+                    val id = if (idIdx >= 0) cursor.getLong(idIdx) else null
 
-                    onMediaDetected(uri, name, mime)
+                    val itemUri = if (isItemUri) uri else {
+                        id?.let { Uri.withAppendedPath(uri, it.toString()) } ?: uri
+                    }
+
+                    onMediaDetected(itemUri, name, mime)
                 }
             }
         } catch (e: Exception) {
