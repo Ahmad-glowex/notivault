@@ -23,7 +23,6 @@ import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Button
@@ -41,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,13 +56,14 @@ import androidx.compose.ui.unit.dp
 import com.notivault.app.NotiVaultApp
 import com.notivault.app.service.media.MediaObserverService
 import com.notivault.app.service.media.RootViewOnceManager
-import com.notivault.app.service.media.ViewOnceSimulator
 import com.notivault.app.ui.theme.DarkBackground
 import com.notivault.app.ui.theme.DarkSurface
 import com.notivault.app.ui.theme.TealSecondary
 import com.notivault.app.ui.theme.TextPrimaryDark
 import com.notivault.app.ui.theme.TextSecondaryDark
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,8 +75,17 @@ fun ViewOnceCompanionScreen(
     val app = context.applicationContext as NotiVaultApp
     val coroutineScope = rememberCoroutineScope()
     val viewOnceCount by app.mediaRepository.getViewOnceMediaCount().collectAsState(initial = 0)
-    var isSimulating by remember { mutableStateOf(false) }
-    val isRoot = remember { RootViewOnceManager.isRootAvailable() }
+    var isScanning by remember { mutableStateOf(false) }
+    var isRoot by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            val rootAvail = RootViewOnceManager.isRootAvailable()
+            withContext(Dispatchers.Main) {
+                isRoot = rootAvail
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -89,7 +99,7 @@ fun ViewOnceCompanionScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = if (isRoot) "Root Sandbox Sniper: ARMED" else "Dual Pipeline: Active",
+                            text = if (isRoot) "Root Sandbox Mode: Active" else "Standard Media Pipeline: Active",
                             style = MaterialTheme.typography.labelSmall,
                             color = TealSecondary
                         )
@@ -203,69 +213,7 @@ fun ViewOnceCompanionScreen(
                 }
             }
 
-            // Test & Verification Card
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F2E2B)),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Science,
-                            contentDescription = null,
-                            tint = TealSecondary,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "ভেরিফিকেশন টেস্ট (Chat Bubble Test)",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = TextPrimaryDark,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "এই বাটনে চাপ দিলে একটি রিয়েল টেস্ট ইমেজ তৈরি হয়ে আপনার লেটেস্ট ভিউ-ওয়ান্স মেসেজে সরাসরি যুক্ত হবে। এরপর চ্যাট স্ক্রিনে ঢুকলেই দেখতে পাবেন '📷 ① Sent a photo' টেক্সট আর নেই, সরাসরি ছবি দেখা যাচ্ছে!",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFFCBD5E1),
-                        lineHeight = MaterialTheme.typography.bodyMedium.lineHeight
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = {
-                            coroutineScope.launch {
-                                isSimulating = true
-                                val success = ViewOnceSimulator.injectTestViewOnceMedia(context)
-                                isSimulating = false
-                                if (success) {
-                                    Toast.makeText(
-                                        context,
-                                        "টেস্ট সফল! এখন চ্যাট ওপেন করে ভিউ-ওয়ান্স ছবি সরাসরি দেখুন।",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                } else {
-                                    Toast.makeText(context, "টেস্ট ব্যর্থ হয়েছে।", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        },
-                        enabled = !isSimulating,
-                        colors = ButtonDefaults.buttonColors(containerColor = TealSecondary),
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Icon(Icons.Default.Science, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (isSimulating) "ইনজেকশন চলছে..." else "চ্যাট বাবল টেস্ট চালান (Inject Test Image)",
-                            color = Color.Black,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-
-            // Operations & Manual Trigger Card
+            // Real Operations & Manual Sniper Card
             Card(
                 colors = CardDefaults.cardColors(containerColor = DarkSurface),
                 shape = RoundedCornerShape(12.dp)
@@ -280,7 +228,7 @@ fun ViewOnceCompanionScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "How View-Once Extraction Works",
+                            text = "ভিউ-ওয়ান্স উদ্ধার প্রক্রিয়া",
                             style = MaterialTheme.typography.titleSmall,
                             color = TextPrimaryDark,
                             fontWeight = FontWeight.Bold
@@ -288,32 +236,40 @@ fun ViewOnceCompanionScreen(
                     }
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = "১. স্বয়ংক্রিয় ডিটেকশন: সেন্ডার যখন '① Photo' পাঠায়, NotiVault তাৎক্ষণিক হাই-স্পিড স্নাইপার সক্রিয় করে।\n\n" +
-                                "২. রুট স্যান্ডবক্স মোড: ফোন রুটেড থাকলে NotiVault সরাসরি WhatsApp-এর এনক্রিপ্টেড ফোল্ডার (/data/data/com.whatsapp/files/ViewOnce) থেকে বাইনারি ম্যাজিক বাইটস ডিটেক্ট করে ছবি সংগ্রহ করে চ্যাট বাবলে শো করায়।\n\n" +
-                                "৩. নন-রুট মোড (LSPatch / WaEnhancer): নন-রুট ডিভাইসে WhatsApp-এর ইন্টিগ্রেশন চালু থাকলে WhatsApp স্বয়ংক্রিয়ভাবে ছবি সেভ করে এবং NotiVault তা মেসেজে সংযুক্ত করে ফেলে।",
+                        text = "১. স্বয়ংক্রিয় ইন্টারসেপশন: নোটিফিকেশন এলেই NotiVault সরাসরি হাই-স্পিড স্নাইপার ও মিডিয়া অবজারভার চালু করে।\n\n" +
+                                "২. রুট মোড: রুটেড ডিভাইসে সরাসরি WhatsApp-এর এনক্রিপ্টেড স্যান্ডবক্স ফোল্ডার (/data/data/com.whatsapp/files/ViewOnce) এবং ডেটাবেস থেকে আসল ছবি উদ্ধার করে চ্যাট বাবলে শো করানো হয়।\n\n" +
+                                "৩. নন-রুট মোড: LSPatch + WaEnhancer মডিউল ব্যবহার করলে WhatsApp ভিউ-ওয়ান্স মিডিয়া লোকাল স্টোরেজে সাধারণ ছবির মতো রেখে দেয়, যা NotiVault তাৎক্ষণিক সংরক্ষণ করে বাবলে দেখায়।",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color(0xFFCBD5E1),
                         lineHeight = MaterialTheme.typography.bodyMedium.lineHeight
                     )
                     Spacer(modifier = Modifier.height(14.dp))
-                    OutlinedButton(
+                    Button(
                         onClick = {
                             coroutineScope.launch {
+                                isScanning = true
                                 val rootExtracted = if (isRoot) RootViewOnceManager.extractViewOnceFiles(context) else 0
                                 MediaObserverService.triggerViewOnceSniff(context, "com.whatsapp")
+                                isScanning = false
                                 if (rootExtracted > 0) {
-                                    Toast.makeText(context, "$rootExtracted টি View-Once মিডিয়া রুট দিয়ে উদ্ধার হয়েছে!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "$rootExtracted টি View-Once মিডিয়া উদ্ধার করে চ্যাট বাবলে যুক্ত করা হয়েছে!", Toast.LENGTH_LONG).show()
                                 } else {
-                                    Toast.makeText(context, "স্নাইপার স্ক্যান সফলভাবে সম্পন্ন হয়েছে!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "স্নাইপার স্ক্যান সম্পন্ন হয়েছে। কোনো নতুন ফাইল পাওয়া যায়নি।", Toast.LENGTH_SHORT).show()
                                 }
                             }
                         },
+                        enabled = !isScanning,
                         modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = TealSecondary),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.Black)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("ম্যানুয়াল স্নাইপার স্ক্যান চালান")
+                        Text(
+                            text = if (isScanning) "স্নাইপার স্ক্যান চলছে..." else "স্নাইপার স্ক্যান চালান (Run Sniper Scan)",
+                            color = Color.Black,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }

@@ -22,7 +22,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoDelete
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -31,6 +37,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -39,10 +46,18 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import android.widget.Toast
+import com.notivault.app.data.local.entity.MessageEntity
+import com.notivault.app.service.media.MediaObserverService
+import com.notivault.app.service.media.RootViewOnceManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -71,8 +86,20 @@ fun ChatDetailScreen(
     val exportIntent by viewModel.exportIntent.collectAsState()
     val listState = rememberLazyListState()
 
+    val coroutineScope = rememberCoroutineScope()
     var showMenu by remember { mutableStateOf(false) }
     var viewingMedia by remember { mutableStateOf<MediaEntity?>(null) }
+    var recoveryMessage by remember { mutableStateOf<MessageEntity?>(null) }
+    var isRoot by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            val root = RootViewOnceManager.isRootAvailable()
+            withContext(Dispatchers.Main) {
+                isRoot = root
+            }
+        }
+    }
 
     LaunchedEffect(exportIntent) {
         exportIntent?.let { intent ->
@@ -235,6 +262,9 @@ fun ChatDetailScreen(
                                     timestamp = message.timestamp,
                                     mediaType = if (isVid) "VIDEO" else "IMAGE"
                                 )
+                            },
+                            onMissingMediaClick = { msg ->
+                                recoveryMessage = msg
                             }
                         )
                     }
@@ -248,6 +278,121 @@ fun ChatDetailScreen(
                     onDelete = { viewingMedia = null }
                 )
             }
+
+            recoveryMessage?.let { targetMsg ->
+                ViewOnceRecoveryDialog(
+                    message = targetMsg,
+                    isRoot = isRoot,
+                    onDismiss = { recoveryMessage = null },
+                    onTriggerRootRecovery = {
+                        coroutineScope.launch {
+                            Toast.makeText(context, "রুট স্যান্ডবক্স স্নাইপার স্ক্যান শুরু হচ্ছে...", Toast.LENGTH_SHORT).show()
+                            val recovered = RootViewOnceManager.extractViewOnceFiles(context, targetMsg.packageName)
+                            recoveryMessage = null
+                            if (recovered > 0) {
+                                Toast.makeText(context, "$recovered টি ভিউ-ওয়ান্স মিডিয়া উদ্ধার হয়েছে এবং চ্যাট বাবলে যুক্ত হয়েছে!", Toast.LENGTH_LONG).show()
+                            } else {
+                                Toast.makeText(context, "স্যান্ডবক্সে ফাইলটি পাওয়া যায়নি। (হয়তো WhatsApp ইতিমধ্যে মুছে ফেলেছে)", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    },
+                    onTriggerStorageScan = {
+                        coroutineScope.launch {
+                            MediaObserverService.triggerViewOnceSniff(context, targetMsg.packageName)
+                            recoveryMessage = null
+                            Toast.makeText(context, "স্টোরেজ স্নাইপার স্ক্যান চালু করা হয়েছে...", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                )
+            }
         }
     }
+}
+
+@Composable
+fun ViewOnceRecoveryDialog(
+    message: MessageEntity,
+    isRoot: Boolean,
+    onDismiss: () -> Unit,
+    onTriggerRootRecovery: () -> Unit,
+    onTriggerStorageScan: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = DarkSurface,
+        titleContentColor = TextPrimaryDark,
+        textContentColor = Color(0xFFCBD5E1),
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Visibility,
+                contentDescription = null,
+                tint = TealSecondary,
+                modifier = Modifier.size(28.dp)
+            )
+        },
+        title = {
+            Text(
+                text = "ভিউ-ওয়ান্স মিডিয়া স্ট্যাটাস ও রিকভারি",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (isRoot) {
+                    Text(
+                        text = "✅ আপনার ডিভাইসে Root Privilege সক্রিয় আছে!",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = TealSecondary
+                    )
+                    Text(
+                        text = "NotiVault সরাসরি WhatsApp-এর এনক্রিপ্টেড স্যান্ডবক্স ফোল্ডার (/data/data/com.whatsapp/files/ViewOnce) অথবা অভ্যন্তরীণ ডেটাবেস থেকে আসল ছবি উদ্ধার করার চেষ্টা করতে পারে।",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                } else {
+                    Text(
+                        text = "ℹ️ ভিউ-ওয়ান্স মিডিয়া অ্যান্ড্রয়েড স্যান্ডবক্সে সংরক্ষিত",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF38BDF8)
+                    )
+                    Text(
+                        text = "অ্যান্ড্রয়েডের লিনাক্স সিকিউরিটি কাঠামোর কারণে কোনো সাধারণ অ্যাপ সরাসরি WhatsApp-এর অভ্যন্তরীণ ফোল্ডার (/data/data/com.whatsapp) রিড করতে পারে না।\n\n" +
+                                "ভিউ-ওয়ান্স ছবি স্বয়ংক্রিয়ভাবে পেতে নিম্নলিখিত উপায়গুলো কাজ করে:\n" +
+                                "১. Root Access: ফোন রুটেড থাকলে NotiVault সরাসরি স্যান্ডবক্স থেকে আসল ছবি উদ্ধার করে বাবলে শো করায়।\n" +
+                                "২. LSPatch + WaEnhancer: নন-রুট ডিভাইসে LSPatch-এর মাধ্যমে WaEnhancer মডিউল ব্যবহার করলে WhatsApp স্বয়ংক্রিয়ভাবে ভিউ-ওয়ান্স ছবি আপনার গ্যালারিতে সেভ করে ফেলে, এবং NotiVault তা চ্যাট বাবলে সরাসরি শো করে।\n" +
+                                "৩. সাধারণ ছবি: সেন্ডার যদি সাধারণ ছবি হিসেবে পাঠায় (যেমন উপরে পাঠানো গণিতের নোটস), NotiVault তা মুহূর্তের মধ্যেই চ্যাট বাবলে সুন্দরভাবে প্রদর্শন করে।",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            if (isRoot) {
+                Button(
+                    onClick = onTriggerRootRecovery,
+                    colors = ButtonDefaults.buttonColors(containerColor = TealSecondary)
+                ) {
+                    Icon(Icons.Default.FlashOn, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("স্যান্ডবক্স থেকে উদ্ধার করুন", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            } else {
+                Button(
+                    onClick = onTriggerStorageScan,
+                    colors = ButtonDefaults.buttonColors(containerColor = TealSecondary)
+                ) {
+                    Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("স্টোরেজ স্ক্যান করুন", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("বন্ধ করুন", color = TextSecondaryDark)
+            }
+        }
+    )
 }

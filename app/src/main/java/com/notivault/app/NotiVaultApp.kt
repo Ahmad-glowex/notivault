@@ -102,8 +102,11 @@ class NotiVaultApp : Application() {
                         MediaStoreObserver.isBlacklisted(m.internalSavedPath, "", m.fileName)
                 val isQrBlob = m.fileName.contains("qr", ignoreCase = true) || m.originalPath.contains("qr", ignoreCase = true)
                 val isAvatarImage = m.originalPath.startsWith("notification_") && m.fileSizeBytes < 2500
+                val isSyntheticMock = m.originalPath.contains("test_view_once") ||
+                        m.internalSavedPath.contains("test_view_once") ||
+                        m.fileName.contains("test_view_once")
 
-                if (isBlacklisted || isQrBlob || isAvatarImage) {
+                if (isBlacklisted || isQrBlob || isAvatarImage || isSyntheticMock) {
                     try {
                         val file = File(m.internalSavedPath)
                         if (file.exists()) file.delete()
@@ -112,9 +115,17 @@ class NotiVaultApp : Application() {
                 }
             }
 
-            // Also clean up any message records where mediaUri pointed to an avatar or deleted file
+            // Also clean up any message records where mediaUri pointed to an avatar, deleted file, or synthetic mock
             val allMessages = messageDao.getAllMessagesSync()
             for (msg in allMessages) {
+                if (msg.originalNotificationKey?.startsWith("demo_vo_") == true) {
+                    messageDao.deleteMessage(msg.id)
+                    continue
+                }
+                if (msg.mediaUri?.contains("test_view_once") == true) {
+                    messageDao.clearMessageMedia(msg.id)
+                    continue
+                }
                 if (msg.hasMedia && !msg.mediaUri.isNullOrEmpty()) {
                     val file = File(msg.mediaUri)
                     val isLikelyAvatar = file.exists() && file.length() < 2500 &&

@@ -53,7 +53,8 @@ fun MessageBubble(
     message: MessageEntity,
     isGroup: Boolean,
     modifier: Modifier = Modifier,
-    onMediaClick: ((String) -> Unit)? = null
+    onMediaClick: ((String) -> Unit)? = null,
+    onMissingMediaClick: ((MessageEntity) -> Unit)? = null
 ) {
     val isSelf = message.isSelf
     val isDeleted = message.isDeleted
@@ -105,14 +106,24 @@ fun MessageBubble(
         val bubbleWidthMin = if (mediaFile != null) 240.dp else 120.dp
         val bubbleWidthMax = if (mediaFile != null) 340.dp else 320.dp
 
-        Box(
-            modifier = Modifier
+        val boxModifier = if (mediaFile == null && isViewOnce && onMissingMediaClick != null) {
+            Modifier
+                .widthIn(min = bubbleWidthMin, max = bubbleWidthMax)
+                .clip(bubbleShape)
+                .border(1.dp, borderColor, bubbleShape)
+                .background(bubbleColor)
+                .clickable { onMissingMediaClick.invoke(message) }
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+        } else {
+            Modifier
                 .widthIn(min = bubbleWidthMin, max = bubbleWidthMax)
                 .clip(bubbleShape)
                 .border(1.dp, borderColor, bubbleShape)
                 .background(bubbleColor)
                 .padding(horizontal = 12.dp, vertical = 10.dp)
-        ) {
+        }
+
+        Box(modifier = boxModifier) {
             Column {
                 // In group chats, display sender name
                 if (isGroup && !isSelf && message.senderName.isNotBlank()) {
@@ -142,6 +153,11 @@ fun MessageBubble(
                                 if (isCached) TealSecondary.copy(alpha = 0.15f)
                                 else Color(0xFFF59E0B).copy(alpha = 0.15f)
                             )
+                            .then(
+                                if (!isCached && onMissingMediaClick != null) {
+                                    Modifier.clickable { onMissingMediaClick.invoke(message) }
+                                } else Modifier
+                            )
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Icon(
@@ -152,7 +168,7 @@ fun MessageBubble(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (isCached) "View Once Preserved" else "View Once Notification",
+                            text = if (isCached) "View Once Preserved" else "View Once (ট্যাপ করে রিকভারি দেখুন)",
                             style = MaterialTheme.typography.labelSmall,
                             color = if (isCached) TealSecondary else Color(0xFFF59E0B),
                             fontWeight = FontWeight.SemiBold

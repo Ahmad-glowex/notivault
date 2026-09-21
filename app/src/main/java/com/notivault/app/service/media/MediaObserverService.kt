@@ -257,9 +257,9 @@ class MediaObserverService : Service() {
             if (appEntity != null && !appEntity.isEnabled) return@launch
 
             // CRITICAL SAFEGUARD: Never copy old existing files from phone storage!
-            // Only process files modified within the last 3 minutes
+            // Only process files modified within the last 15 minutes (or 60s future clock skew)
             val fileAge = System.currentTimeMillis() - file.lastModified()
-            if (fileAge > 180_000L || fileAge < -60_000L) {
+            if (fileAge > 900_000L || fileAge < -60_000L) {
                 return@launch
             }
 
