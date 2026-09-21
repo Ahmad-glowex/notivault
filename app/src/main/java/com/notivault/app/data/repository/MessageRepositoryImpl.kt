@@ -56,13 +56,23 @@ class MessageRepositoryImpl(
         notificationKey: String?,
         isGroup: Boolean,
         hasMedia: Boolean,
-        mediaUri: String?
+        mediaUri: String?,
+        mediaMimeType: String?
     ): Long = withContext(Dispatchers.IO) {
         val cleanTitle = com.notivault.app.service.engine.DeletedMessageDetector.sanitize(chatTitle).ifEmpty {
             com.notivault.app.service.engine.DeletedMessageDetector.sanitize(senderName).ifEmpty { "Unknown" }
         }
         val resolvedSender = com.notivault.app.service.engine.DeletedMessageDetector.sanitize(senderName).ifEmpty { cleanTitle }
         val threadId = "${packageName}_$cleanTitle"
+
+        val isVideo = mediaMimeType?.startsWith("video") == true ||
+                com.notivault.app.service.parser.NotificationParser.isVideoIndicatingText(messageText)
+        val resolvedMime = when {
+            !mediaMimeType.isNullOrBlank() -> mediaMimeType
+            isVideo -> "video/mp4"
+            hasMedia -> "image/jpeg"
+            else -> null
+        }
 
         // Safeguard: If message text indicates deletion, route to markDeletedBySender
         if (com.notivault.app.service.engine.DeletedMessageDetector.isDeletedNotification(messageText)) {
@@ -86,15 +96,15 @@ class MessageRepositoryImpl(
         if (existingMsg != null) {
             // If new notification has media but stored one did not, update media
             if (!mediaUri.isNullOrEmpty() && existingMsg.mediaUri.isNullOrEmpty()) {
-                messageDao.updateMessageMedia(existingMsg.id, mediaUri, "image/jpeg")
+                messageDao.updateMessageMedia(existingMsg.id, mediaUri, resolvedMime ?: "image/jpeg")
             }
             return@withContext existingMsg.id
         }
 
         // Attempt linking with recently cached unlinked media for this package (e.g. MediaStoreObserver captured just before notification)
         var resolvedMediaUri = mediaUri
-        var resolvedHasMedia = hasMedia
-        if (resolvedMediaUri.isNullOrEmpty() && (hasMedia || com.notivault.app.service.parser.NotificationParser.run { messageText.contains("photo", ignoreCase = true) || messageText.contains("📷") })) {
+        var resolvedHasMedia = hasMedia || isVideo
+        if (resolvedMediaUri.isNullOrEmpty() && (hasMedia || isVideo || com.notivault.app.service.parser.NotificationParser.run { messageText.contains("photo", ignoreCase = true) || messageText.contains("📷") })) {
             val unlinkedMedia = db.mediaDao().getRecentUnlinkedMediaForPackage(packageName, sinceTimestamp = timestamp - 30000L)
             if (unlinkedMedia != null) {
                 resolvedMediaUri = unlinkedMedia.internalSavedPath
@@ -130,7 +140,7 @@ class MessageRepositoryImpl(
             originalNotificationKey = notificationKey,
             hasMedia = resolvedHasMedia,
             mediaUri = resolvedMediaUri,
-            mediaMimeType = if (resolvedHasMedia) "image/jpeg" else null,
+            mediaMimeType = resolvedMime,
             isSelf = false
         )
         val msgId = messageDao.insertMessage(messageEntity)

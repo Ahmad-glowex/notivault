@@ -18,8 +18,7 @@ class MediaFileObserver(
         if ((event and (CLOSE_WRITE or MOVED_TO or CREATE)) != 0) {
             val file = File(directory, path)
             // Skip .nomedia file specifically, but allow files in .Shared or hidden cache dirs
-            if (file.name.equals(".nomedia", ignoreCase = true)) return
-            if (file.exists() && file.isFile && file.length() > 0) {
+            if (file.exists() && file.isFile) {
                 onNewMediaFile(file, packageName)
             }
         }

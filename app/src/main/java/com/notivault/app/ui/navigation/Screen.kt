@@ -7,6 +7,7 @@ sealed class Screen(val route: String) {
     data object MediaGallery : Screen("media_gallery")
     data object DeletedMessages : Screen("deleted_messages")
     data object Settings : Screen("settings")
+    data object ViewOnceCompanion : Screen("view_once_companion")
 
     data object ChatDetail : Screen("chat_detail/{threadId}") {
         fun createRoute(threadId: String): String = "chat_detail/${Uri.encode(threadId)}"

@@ -152,7 +152,8 @@ class NotiVaultListenerService : NotificationListenerService() {
                             notificationKey = item.notificationKey,
                             isGroup = item.isGroup,
                             hasMedia = hasMedia,
-                            mediaUri = savedMediaUri
+                            mediaUri = savedMediaUri,
+                            mediaMimeType = item.mediaType
                         )
 
                         if (hasMedia || NotificationParser.isVideoIndicatingText(item.messageText) || NotificationParser.isMediaIndicatingText(item.messageText)) {

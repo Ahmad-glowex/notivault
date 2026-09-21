@@ -108,6 +108,7 @@ fun MediaGalleryScreen(
             // Filter categories
             val filters = listOf(
                 Pair("ALL", "All Media"),
+                Pair("VIEW_ONCE", "View-Once"),
                 Pair("IMAGE", "Photos"),
                 Pair("VIDEO", "Videos"),
                 Pair("AUDIO", "Audio / Voice")

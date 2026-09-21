@@ -26,7 +26,8 @@ interface MessageRepository {
         notificationKey: String?,
         isGroup: Boolean = false,
         hasMedia: Boolean = false,
-        mediaUri: String? = null
+        mediaUri: String? = null,
+        mediaMimeType: String? = null
     ): Long
 
     suspend fun markDeletedBySender(

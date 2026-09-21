@@ -317,10 +317,10 @@ class MediaObserverService : Service() {
             val existing = app.mediaRepository.getMediaByOriginalPath(file.absolutePath)
             if (existing != null) return@launch
 
-            // Wait briefly if file is currently being written/flushed to disk (e.g. video chunks)
+            // Wait if file is currently being written/flushed to disk (e.g. video chunks)
             var attempts = 0
             var lastLen = -1L
-            while (attempts < 5 && file.exists()) {
+            while (attempts < 15 && file.exists()) {
                 val len = file.length()
                 if (len > 0 && len == lastLen) break
                 lastLen = len
@@ -346,14 +346,15 @@ class MediaObserverService : Service() {
                 }
 
                 val now = System.currentTimeMillis()
+                val pendingWindow = 4 * 3600 * 1000L // 4 hours window for pending media
                 val msgDao = app.database.messageDao()
                 val targetMsg = if (mediaType == "VIDEO") {
-                    msgDao.getLatestPendingVideoMessage(packageName, sinceTimestamp = now - 300000L)
-                        ?: msgDao.getLatestPendingMediaMessage(packageName, sinceTimestamp = now - 300000L)
-                        ?: msgDao.getLatestMessageForPackage(packageName, sinceTimestamp = now - 180000L)
+                    msgDao.getLatestPendingVideoMessage(packageName, sinceTimestamp = now - pendingWindow)
+                        ?: msgDao.getLatestPendingMediaMessage(packageName, sinceTimestamp = now - pendingWindow)
+                        ?: msgDao.getLatestMessageForPackage(packageName, sinceTimestamp = now - 1800000L)
                 } else {
-                    msgDao.getLatestPendingMediaMessage(packageName, sinceTimestamp = now - 300000L)
-                        ?: msgDao.getLatestMessageForPackage(packageName, sinceTimestamp = now - 180000L)
+                    msgDao.getLatestPendingMediaMessage(packageName, sinceTimestamp = now - pendingWindow)
+                        ?: msgDao.getLatestMessageForPackage(packageName, sinceTimestamp = now - 1800000L)
                 }
 
                 val threadId = targetMsg?.threadId
@@ -405,15 +406,16 @@ class MediaObserverService : Service() {
                 val mediaType = if (mime.startsWith("video") || cachedFile.extension in listOf("mp4", "mkv", "3gp", "webm")) "VIDEO" else "IMAGE"
                 val resolvedMime = if (mediaType == "VIDEO" && !mime.startsWith("video")) "video/mp4" else mime
                 val now = System.currentTimeMillis()
+                val pendingWindow = 4 * 3600 * 1000L // 4 hours window for pending media
 
                 val msgDao = app.database.messageDao()
                 val targetMsg = if (mediaType == "VIDEO") {
-                    msgDao.getLatestPendingVideoMessage(packageName, sinceTimestamp = now - 300000L)
-                        ?: msgDao.getLatestPendingMediaMessage(packageName, sinceTimestamp = now - 300000L)
-                        ?: msgDao.getLatestMessageForPackage(packageName, sinceTimestamp = now - 180000L)
+                    msgDao.getLatestPendingVideoMessage(packageName, sinceTimestamp = now - pendingWindow)
+                        ?: msgDao.getLatestPendingMediaMessage(packageName, sinceTimestamp = now - pendingWindow)
+                        ?: msgDao.getLatestMessageForPackage(packageName, sinceTimestamp = now - 1800000L)
                 } else {
-                    msgDao.getLatestPendingMediaMessage(packageName, sinceTimestamp = now - 300000L)
-                        ?: msgDao.getLatestMessageForPackage(packageName, sinceTimestamp = now - 180000L)
+                    msgDao.getLatestPendingMediaMessage(packageName, sinceTimestamp = now - pendingWindow)
+                        ?: msgDao.getLatestMessageForPackage(packageName, sinceTimestamp = now - 1800000L)
                 }
 
                 val threadId = targetMsg?.threadId

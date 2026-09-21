@@ -25,10 +25,10 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
     val selectedMedia: StateFlow<MediaEntity?> = _selectedMedia.asStateFlow()
 
     val mediaList: StateFlow<List<MediaEntity>> = _selectedFilter.flatMapLatest { filter ->
-        if (filter == "ALL") {
-            mediaRepo.getAllMedia()
-        } else {
-            mediaRepo.getMediaByType(filter)
+        when (filter) {
+            "ALL" -> mediaRepo.getAllMedia()
+            "VIEW_ONCE" -> mediaRepo.getViewOnceMedia()
+            else -> mediaRepo.getMediaByType(filter)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 

@@ -83,8 +83,7 @@ class NotiVaultApp : Application() {
             for (m in allMedia) {
                 val isBlacklisted = MediaStoreObserver.isBlacklisted(m.originalPath, "", m.fileName) ||
                         MediaStoreObserver.isBlacklisted(m.internalSavedPath, "", m.fileName)
-                val isQrBlob = (m.mediaType.startsWith("VIEW_ONCE") || m.packageName == "com.whatsapp.web") &&
-                        m.fileName.startsWith("view_once") && m.fileSizeBytes in 150000..450000
+                val isQrBlob = m.fileName.contains("qr", ignoreCase = true) || m.originalPath.contains("qr", ignoreCase = true)
                 val isAvatarImage = m.originalPath.startsWith("notification_") && m.fileSizeBytes < 2500
 
                 if (isBlacklisted || isQrBlob || isAvatarImage) {

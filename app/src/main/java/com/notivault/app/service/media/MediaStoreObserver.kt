@@ -29,6 +29,7 @@ class MediaStoreObserver(
             ).apply {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     add(MediaStore.MediaColumns.RELATIVE_PATH)
+                    add(MediaStore.MediaColumns.IS_PENDING)
                 }
             }.toTypedArray()
 
@@ -37,7 +38,15 @@ class MediaStoreObserver(
 
             contentResolver.query(uri, projection, null, null, sortOrder)?.use { cursor ->
                 var processed = 0
+                val isPendingIdx = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    cursor.getColumnIndex(MediaStore.MediaColumns.IS_PENDING)
+                } else -1
+
                 while (cursor.moveToNext() && processed < 5) {
+                    if (isPendingIdx >= 0 && cursor.getInt(isPendingIdx) == 1) {
+                        // File is currently being streamed to disk, wait for IS_PENDING = 0
+                        continue
+                    }
                     processed++
                     val nameIdx = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME)
                     val mimeIdx = cursor.getColumnIndex(MediaStore.MediaColumns.MIME_TYPE)
