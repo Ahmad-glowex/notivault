@@ -2,11 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!--
-        PRIVACY GUARANTEE:
-        Notice that android.permission.INTERNET is STRICTLY OMITTED.
-        NotiVault is 100% offline. No telemetry, no external connections, no cloud sync.
-    -->
+    <!-- Internet permission for embedded WhatsApp Web client & Linked Device View-Once Engine -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- Storage permissions for Media Backup & Observer -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />

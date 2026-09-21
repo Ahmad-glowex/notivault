@@ -22,7 +22,8 @@ enum class AppTab(val label: String, val packageName: String?) {
     MESSENGER("Messenger", "com.facebook.orca"),
     INSTAGRAM("Instagram", "com.instagram.android"),
     TELEGRAM("Telegram", "org.telegram.messenger"),
-    SAVED_MEDIA("Saved Media", "MEDIA_TAB")
+    SAVED_MEDIA("Saved Media", "MEDIA_TAB"),
+    VIEW_ONCE("View-Once Vault", "VIEW_ONCE_TAB")
 }
 
 @Composable

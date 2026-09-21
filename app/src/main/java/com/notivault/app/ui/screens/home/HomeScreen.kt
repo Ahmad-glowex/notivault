@@ -17,17 +17,23 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.AutoDelete
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -71,6 +77,7 @@ fun HomeScreen(
     onNavigateToMedia: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToDeleted: () -> Unit = {},
+    onNavigateToViewOnce: () -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -138,6 +145,13 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onNavigateToViewOnce) {
+                        Icon(
+                            imageVector = Icons.Default.Devices,
+                            contentDescription = "View-Once Vault",
+                            tint = TealSecondary
+                        )
+                    }
                     IconButton(onClick = onNavigateToMedia) {
                         Icon(
                             imageVector = Icons.Default.Image,
@@ -158,6 +172,78 @@ fun HomeScreen(
                 )
             )
         },
+        bottomBar = {
+            NavigationBar(
+                containerColor = DarkSurface,
+                contentColor = TextPrimaryDark
+            ) {
+                NavigationBarItem(
+                    selected = true,
+                    onClick = { },
+                    icon = { Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Chats") },
+                    label = { Text("Chats") },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color.Black,
+                        selectedTextColor = TealSecondary,
+                        indicatorColor = TealSecondary,
+                        unselectedIconColor = TextSecondaryDark,
+                        unselectedTextColor = TextSecondaryDark
+                    )
+                )
+                NavigationBarItem(
+                    selected = false,
+                    onClick = onNavigateToViewOnce,
+                    icon = { Icon(Icons.Default.Devices, contentDescription = "View-Once Vault") },
+                    label = { Text("View-Once") },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color.Black,
+                        selectedTextColor = TealSecondary,
+                        indicatorColor = TealSecondary,
+                        unselectedIconColor = TextSecondaryDark,
+                        unselectedTextColor = TextSecondaryDark
+                    )
+                )
+                NavigationBarItem(
+                    selected = false,
+                    onClick = onNavigateToDeleted,
+                    icon = { Icon(Icons.Default.AutoDelete, contentDescription = "Deleted") },
+                    label = { Text("Deleted") },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color.Black,
+                        selectedTextColor = TealSecondary,
+                        indicatorColor = TealSecondary,
+                        unselectedIconColor = TextSecondaryDark,
+                        unselectedTextColor = TextSecondaryDark
+                    )
+                )
+                NavigationBarItem(
+                    selected = false,
+                    onClick = onNavigateToMedia,
+                    icon = { Icon(Icons.Default.Image, contentDescription = "Media") },
+                    label = { Text("Media") },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color.Black,
+                        selectedTextColor = TealSecondary,
+                        indicatorColor = TealSecondary,
+                        unselectedIconColor = TextSecondaryDark,
+                        unselectedTextColor = TextSecondaryDark
+                    )
+                )
+                NavigationBarItem(
+                    selected = false,
+                    onClick = onNavigateToSettings,
+                    icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
+                    label = { Text("Settings") },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color.Black,
+                        selectedTextColor = TealSecondary,
+                        indicatorColor = TealSecondary,
+                        unselectedIconColor = TextSecondaryDark,
+                        unselectedTextColor = TextSecondaryDark
+                    )
+                )
+            }
+        },
         containerColor = DarkBackground
     ) { paddingValues ->
         Column(
@@ -176,7 +262,7 @@ fun HomeScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Deleted messages badge (clickable link to Preserved Deleted Messages)
                 Row(
@@ -185,7 +271,7 @@ fun HomeScreen(
                         .clip(RoundedCornerShape(8.dp))
                         .background(DarkSurface)
                         .clickable { onNavigateToDeleted() }
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -196,7 +282,7 @@ fun HomeScreen(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "$deletedCount Deleted Saved",
+                        text = "$deletedCount Deleted",
                         style = MaterialTheme.typography.labelSmall,
                         color = TextPrimaryDark,
                         fontWeight = FontWeight.Medium
@@ -210,7 +296,7 @@ fun HomeScreen(
                         .clip(RoundedCornerShape(8.dp))
                         .background(DarkSurface)
                         .clickable { onNavigateToMedia() }
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -221,7 +307,32 @@ fun HomeScreen(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "$mediaCount Media Cached",
+                        text = "$mediaCount Media",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextPrimaryDark,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                // View-Once Vault badge (clickable link to ViewOnceVaultScreen)
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(DarkSurface)
+                        .clickable { onNavigateToViewOnce() }
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Visibility,
+                        contentDescription = null,
+                        tint = Color(0xFF22C55E),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "View-Once",
                         style = MaterialTheme.typography.labelSmall,
                         color = TextPrimaryDark,
                         fontWeight = FontWeight.Medium
@@ -277,10 +388,10 @@ fun HomeScreen(
             AppFilterTabs(
                 selectedTab = selectedTab,
                 onTabSelected = { tab ->
-                    if (tab == AppTab.SAVED_MEDIA) {
-                        onNavigateToMedia()
-                    } else {
-                        viewModel.selectTab(tab)
+                    when (tab) {
+                        AppTab.SAVED_MEDIA -> onNavigateToMedia()
+                        AppTab.VIEW_ONCE -> onNavigateToViewOnce()
+                        else -> viewModel.selectTab(tab)
                     }
                 }
             )

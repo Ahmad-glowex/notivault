@@ -40,9 +40,17 @@ object NotificationParser {
 
         // Skip pure group summary count notifications (e.g. "3 new messages" container)
         val isGroupSummary = (notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0
+        val cleanFallbackForSummary = DeletedMessageDetector.sanitize(fallbackText)
         val isSummaryCountText = (rawTitle.equals("WhatsApp", ignoreCase = true) || rawTitle.isEmpty()) &&
-                (fallbackText.matches(Regex("""^\d+\s+(?:new\s+)?messages?.*$""", RegexOption.IGNORE_CASE)) ||
-                 fallbackText.matches(Regex("""^\d+\s+টি\s+নতুন\s+মেসেজ.*$""")))
+                (cleanFallbackForSummary.matches(Regex("""^\d+\s+(?:new\s+)?messages?.*$""", RegexOption.IGNORE_CASE)) ||
+                 cleanFallbackForSummary.matches(Regex("""^\d+\s+টি\s+নতুন\s+মেসেজ.*$""")) ||
+                 cleanFallbackForSummary.matches(Regex("""^\d+\s+رسائل\s+جديدة.*$""")) ||
+                 cleanFallbackForSummary.matches(Regex("""^\d+\s+نئے\s+پیغامات.*$""")) ||
+                 cleanFallbackForSummary.matches(Regex("""^\d+\s+नए\s+संदेश.*$""")) ||
+                 cleanFallbackForSummary.matches(Regex("""^\d+\s+mensajes?\s+nuevos?.*$""", RegexOption.IGNORE_CASE)) ||
+                 cleanFallbackForSummary.matches(Regex("""^\d+\s+novas?\s+mensagens?.*$""", RegexOption.IGNORE_CASE)) ||
+                 cleanFallbackForSummary.matches(Regex("""^\d+\s+новых?\s+сообщен.*$""", RegexOption.IGNORE_CASE)) ||
+                 cleanFallbackForSummary.matches(Regex("""^\d+\s+条新消息.*$""")))
         if (isGroupSummary && isSummaryCountText) {
             return emptyList()
         }
@@ -290,14 +298,41 @@ object NotificationParser {
                 lower.contains("voice message") ||
                 lower.contains("view once") ||
                 lower.contains("opened") ||
+                // Bengali
                 lower.contains("ছবি") ||
                 lower.contains("ভিডিও") ||
                 lower.contains("একবার দেখার") ||
                 lower.contains("ভিউ ওয়ান্স") ||
                 lower.contains("খোলা হয়েছে") ||
+                // Hindi
                 lower.contains("खोला गया") ||
                 lower.contains("फ़ोटो") ||
                 lower.contains("वीडियो") ||
+                // Arabic
+                lower.contains("صورة") ||
+                lower.contains("فيديو") ||
+                lower.contains("مقطع صوتي") ||
+                lower.contains("رسالة صوتية") ||
+                lower.contains("عرض لمرة واحدة") ||
+                // Urdu
+                lower.contains("تصویر") ||
+                lower.contains("صوتی پیغام") ||
+                // Russian
+                lower.contains("фото") ||
+                lower.contains("видео") ||
+                lower.contains("голосовое сообщение") ||
+                // Spanish
+                lower.contains("foto") ||
+                // French
+                lower.contains("vidéo") ||
+                // Chinese
+                lower.contains("照片") ||
+                lower.contains("视频") ||
+                lower.contains("语音") ||
+                // Japanese
+                lower.contains("写真") ||
+                lower.contains("動画") ||
+                // Emojis
                 text.contains("📷") ||
                 text.contains("🎥") ||
                 text.contains("📸") ||
@@ -340,6 +375,7 @@ object NotificationParser {
 
     /**
      * Resolves group chat vs direct chat titles and splits "Sender: Text" patterns.
+     * Sanitizes RTL Unicode isolates and zero-width characters for consistent multilingual thread grouping.
      */
     fun resolveTitleAndSender(
         packageName: String,
@@ -348,35 +384,48 @@ object NotificationParser {
         conversationTitle: String?,
         isGroup: Boolean
     ): Triple<String, String, String> {
+        val cleanRawTitle = DeletedMessageDetector.sanitize(rawTitle)
+        val cleanText = DeletedMessageDetector.sanitize(text)
+        val cleanConvTitle = conversationTitle?.let { DeletedMessageDetector.sanitize(it) }?.takeIf { it.isNotBlank() }
+
         val chatTitle: String
         val senderName: String
-        var messageText = text
+        var messageText = cleanText
 
-        if (!conversationTitle.isNullOrBlank()) {
-            chatTitle = conversationTitle
+        if (!cleanConvTitle.isNullOrBlank()) {
+            chatTitle = cleanConvTitle
             // In group notifications, text or title often has "Alice: Hello"
-            if (rawTitle.isNotBlank() && rawTitle != conversationTitle) {
-                senderName = rawTitle
-            } else if (text.contains(": ")) {
-                val split = text.split(": ", limit = 2)
+            if (cleanRawTitle.isNotBlank() && cleanRawTitle != cleanConvTitle) {
+                senderName = cleanRawTitle
+            } else if (cleanText.contains(": ")) {
+                val split = cleanText.split(": ", limit = 2)
+                senderName = split[0].trim()
+                messageText = split[1].trim()
+            } else if (cleanText.contains("：")) {
+                val split = cleanText.split("：", limit = 2)
                 senderName = split[0].trim()
                 messageText = split[1].trim()
             } else {
-                senderName = rawTitle.ifBlank { chatTitle }
+                senderName = cleanRawTitle.ifBlank { chatTitle }
             }
         } else {
             // Check for title formatted like "GroupName (Sender)"
-            val groupMatch = GROUP_TITLE_SENDER_PATTERN.matchEntire(rawTitle)
+            val groupMatch = GROUP_TITLE_SENDER_PATTERN.matchEntire(cleanRawTitle)
             if (groupMatch != null) {
                 chatTitle = groupMatch.groupValues[1].trim()
                 senderName = groupMatch.groupValues[2].trim()
-            } else if (isGroup && text.contains(": ")) {
-                val split = text.split(": ", limit = 2)
-                chatTitle = rawTitle.ifBlank { "Group Chat" }
+            } else if (isGroup && cleanText.contains(": ")) {
+                val split = cleanText.split(": ", limit = 2)
+                chatTitle = cleanRawTitle.ifBlank { "Group Chat" }
+                senderName = split[0].trim()
+                messageText = split[1].trim()
+            } else if (isGroup && cleanText.contains("：")) {
+                val split = cleanText.split("：", limit = 2)
+                chatTitle = cleanRawTitle.ifBlank { "Group Chat" }
                 senderName = split[0].trim()
                 messageText = split[1].trim()
             } else {
-                chatTitle = rawTitle.ifBlank { "Direct Message" }
+                chatTitle = cleanRawTitle.ifBlank { "Direct Message" }
                 senderName = chatTitle
             }
         }

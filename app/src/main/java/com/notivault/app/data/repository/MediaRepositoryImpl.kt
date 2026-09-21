@@ -18,6 +18,12 @@ class MediaRepositoryImpl(
     override fun getMediaByType(type: String): Flow<List<MediaEntity>> =
         mediaDao.getMediaByType(type)
 
+    override fun getViewOnceMedia(): Flow<List<MediaEntity>> =
+        mediaDao.getViewOnceMedia()
+
+    override fun getViewOnceMediaCount(): Flow<Int> =
+        mediaDao.getViewOnceMediaCount()
+
     override fun getMediaForThread(threadId: String): Flow<List<MediaEntity>> =
         mediaDao.getMediaForThread(threadId)
 

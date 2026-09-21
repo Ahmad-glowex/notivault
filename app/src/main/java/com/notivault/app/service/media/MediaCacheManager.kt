@@ -128,4 +128,45 @@ class MediaCacheManager(private val context: Context) {
             null
         }
     }
+
+    /**
+     * Decodes Base64 media data (such as blobs captured from WhatsApp Web)
+     * and saves directly to app-internal protected storage.
+     */
+    suspend fun cacheBase64Data(base64Data: String, mimeType: String?, prefix: String = "view_once"): File? = withContext(Dispatchers.IO) {
+        try {
+            val cleanBase64 = if (base64Data.contains(",")) {
+                base64Data.substringAfter(",")
+            } else {
+                base64Data
+            }
+            val decodedBytes = android.util.Base64.decode(cleanBase64, android.util.Base64.DEFAULT)
+            if (decodedBytes == null || decodedBytes.isEmpty()) return@withContext null
+
+            val ext = when {
+                mimeType?.contains("image/png") == true -> "png"
+                mimeType?.contains("image/webp") == true -> "webp"
+                mimeType?.contains("image/gif") == true -> "gif"
+                mimeType?.startsWith("image") == true -> "jpg"
+                mimeType?.contains("video/mp4") == true -> "mp4"
+                mimeType?.contains("video/3gp") == true -> "3gp"
+                mimeType?.startsWith("video") == true -> "mp4"
+                mimeType?.contains("audio/ogg") == true -> "ogg"
+                mimeType?.startsWith("audio") == true -> "m4a"
+                else -> "jpg"
+            }
+            val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
+            val uniqueSuffix = java.util.UUID.randomUUID().toString().take(6)
+            val targetName = "${prefix}_${timeStamp}_${uniqueSuffix}.${ext}"
+            val targetFile = File(mediaStorageDir, targetName)
+
+            FileOutputStream(targetFile).use { output ->
+                output.write(decodedBytes)
+            }
+            targetFile
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
 }

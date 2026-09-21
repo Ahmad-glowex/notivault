@@ -6,6 +6,8 @@ import kotlinx.coroutines.flow.Flow
 interface MediaRepository {
     fun getAllMedia(): Flow<List<MediaEntity>>
     fun getMediaByType(type: String): Flow<List<MediaEntity>>
+    fun getViewOnceMedia(): Flow<List<MediaEntity>>
+    fun getViewOnceMediaCount(): Flow<Int>
     fun getMediaForThread(threadId: String): Flow<List<MediaEntity>>
     fun getMediaCount(): Flow<Int>
     suspend fun getMediaById(id: Long): MediaEntity?

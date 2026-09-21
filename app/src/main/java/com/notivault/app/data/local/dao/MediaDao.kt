@@ -15,6 +15,23 @@ interface MediaDao {
     @Query("SELECT * FROM saved_media WHERE mediaType = :type ORDER BY timestamp DESC")
     fun getMediaByType(type: String): Flow<List<MediaEntity>>
 
+    @Query("""
+        SELECT * FROM saved_media 
+        WHERE mediaType LIKE 'VIEW_ONCE%' 
+           OR packageName = 'com.whatsapp.web' 
+           OR threadId LIKE '%view_once%' 
+        ORDER BY timestamp DESC
+    """)
+    fun getViewOnceMedia(): Flow<List<MediaEntity>>
+
+    @Query("""
+        SELECT COUNT(*) FROM saved_media 
+        WHERE mediaType LIKE 'VIEW_ONCE%' 
+           OR packageName = 'com.whatsapp.web' 
+           OR threadId LIKE '%view_once%'
+    """)
+    fun getViewOnceMediaCount(): Flow<Int>
+
     @Query("SELECT * FROM saved_media WHERE threadId = :threadId ORDER BY timestamp DESC")
     fun getMediaForThread(threadId: String): Flow<List<MediaEntity>>
 

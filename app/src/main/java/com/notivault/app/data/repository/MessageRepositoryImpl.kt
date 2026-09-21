@@ -58,8 +58,10 @@ class MessageRepositoryImpl(
         hasMedia: Boolean,
         mediaUri: String?
     ): Long = withContext(Dispatchers.IO) {
-        val cleanTitle = chatTitle.trim().ifEmpty { senderName.trim().ifEmpty { "Unknown" } }
-        val resolvedSender = senderName.trim().ifEmpty { cleanTitle }
+        val cleanTitle = com.notivault.app.service.engine.DeletedMessageDetector.sanitize(chatTitle).ifEmpty {
+            com.notivault.app.service.engine.DeletedMessageDetector.sanitize(senderName).ifEmpty { "Unknown" }
+        }
+        val resolvedSender = com.notivault.app.service.engine.DeletedMessageDetector.sanitize(senderName).ifEmpty { cleanTitle }
         val threadId = "${packageName}_$cleanTitle"
 
         // Safeguard: If message text indicates deletion, route to markDeletedBySender
@@ -140,8 +142,10 @@ class MessageRepositoryImpl(
         senderName: String,
         timestamp: Long
     ): Boolean = withContext(Dispatchers.IO) {
-        var cleanTitle = chatTitle.trim().ifEmpty { senderName.trim().ifEmpty { "Unknown" } }
-        var resolvedSender = senderName.trim().ifEmpty { cleanTitle }
+        var cleanTitle = com.notivault.app.service.engine.DeletedMessageDetector.sanitize(chatTitle).ifEmpty {
+            com.notivault.app.service.engine.DeletedMessageDetector.sanitize(senderName).ifEmpty { "Unknown" }
+        }
+        var resolvedSender = com.notivault.app.service.engine.DeletedMessageDetector.sanitize(senderName).ifEmpty { cleanTitle }
 
         // If title is just the generic app name ("WhatsApp", "Telegram"), ignore it for threadId
         val isGenericAppTitle = cleanTitle.equals("WhatsApp", ignoreCase = true) ||
