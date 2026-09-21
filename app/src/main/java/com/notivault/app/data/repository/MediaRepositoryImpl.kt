@@ -2,6 +2,7 @@ package com.notivault.app.data.repository
 
 import com.notivault.app.data.local.AppDatabase
 import com.notivault.app.data.local.entity.MediaEntity
+import com.notivault.app.service.media.MediaStoreObserver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -48,7 +49,16 @@ class MediaRepositoryImpl(
         threadId: String?,
         messageId: Long?
     ): Long = withContext(Dispatchers.IO) {
-        // Prevent duplicate media entries
+        // 1. Strict blacklist rejection (screenshots, camera DCIM, downloads, sent media)
+        if (MediaStoreObserver.isBlacklisted(originalPath, "", fileName) ||
+            MediaStoreObserver.isBlacklisted(internalSavedPath, "", fileName)) {
+            try {
+                File(internalSavedPath).delete()
+            } catch (_: Exception) {}
+            return@withContext 0L
+        }
+
+        // 2. Prevent duplicate media entries by exact originalPath
         val existing = mediaDao.getMediaByOriginalPath(originalPath)
         if (existing != null) {
             // Delete freshly created duplicate file to avoid disk leak
@@ -58,6 +68,17 @@ class MediaRepositoryImpl(
                 } catch (_: Exception) {}
             }
             return@withContext existing.id
+        }
+
+        // 3. Deduplication by fileName and fileSizeBytes within 5 minutes
+        val existingByNameSize = mediaDao.getMediaByNameAndSize(fileName, fileSizeBytes, System.currentTimeMillis() - 300000L)
+        if (existingByNameSize != null) {
+            if (internalSavedPath != existingByNameSize.internalSavedPath) {
+                try {
+                    File(internalSavedPath).delete()
+                } catch (_: Exception) {}
+            }
+            return@withContext existingByNameSize.id
         }
 
         val entity = MediaEntity(

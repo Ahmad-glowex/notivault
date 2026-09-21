@@ -63,6 +63,18 @@ interface MediaDao {
     @Query("UPDATE saved_media SET threadId = :threadId, messageId = :messageId WHERE id = :id")
     suspend fun updateMediaLinkage(id: Long, threadId: String, messageId: Long?)
 
+    @Query("SELECT * FROM saved_media")
+    suspend fun getAllMediaList(): List<MediaEntity>
+
+    @Query("""
+        SELECT * FROM saved_media 
+        WHERE fileName = :fileName 
+          AND fileSizeBytes = :fileSizeBytes 
+          AND timestamp >= :sinceTimestamp 
+        LIMIT 1
+    """)
+    suspend fun getMediaByNameAndSize(fileName: String, fileSizeBytes: Long, sinceTimestamp: Long): MediaEntity?
+
     @Query("DELETE FROM saved_media")
     suspend fun deleteAllMedia()
 }

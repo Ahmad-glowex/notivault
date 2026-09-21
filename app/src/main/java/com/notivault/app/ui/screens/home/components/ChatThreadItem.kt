@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoDelete
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Icon
@@ -28,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.notivault.app.data.local.entity.ChatThreadEntity
 import com.notivault.app.ui.theme.DarkSurface
+import com.notivault.app.ui.theme.DeletedRed
 import com.notivault.app.ui.theme.InstagramPink
 import com.notivault.app.ui.theme.MessengerBlue
 import com.notivault.app.ui.theme.TelegramBlue
@@ -110,13 +112,29 @@ fun ChatThreadItem(
                 }
             }
 
-            Text(
-                text = thread.lastMessageText.ifBlank { "No message preview" },
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondaryDark,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            val isDeletedPreview = thread.lastMessageText.contains("(Deleted)", ignoreCase = true) ||
+                    thread.lastMessageText.contains("deleted", ignoreCase = true) ||
+                    thread.lastMessageText.contains("ডিলিট", ignoreCase = true)
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isDeletedPreview) {
+                    Icon(
+                        imageVector = Icons.Default.AutoDelete,
+                        contentDescription = null,
+                        tint = DeletedRed,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+                Text(
+                    text = thread.lastMessageText.ifBlank { "No message preview" },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (isDeletedPreview) Color(0xFFFCA5A5) else TextSecondaryDark,
+                    fontWeight = if (isDeletedPreview) FontWeight.Medium else FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
 
         Spacer(modifier = Modifier.width(8.dp))

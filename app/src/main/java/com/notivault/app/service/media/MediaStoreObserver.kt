@@ -11,7 +11,7 @@ import android.provider.MediaStore
 
 class MediaStoreObserver(
     private val context: Context,
-    private val onMediaDetected: (Uri, String, String, String) -> Unit
+    private val onMediaDetected: (Uri, String, String, String, String, String) -> Unit
 ) : ContentObserver(Handler(Looper.getMainLooper())) {
 
     private val contentResolver: ContentResolver = context.contentResolver
@@ -58,7 +58,7 @@ class MediaStoreObserver(
                     }
 
                     val detectedPackage = resolveMessagingPackage(data, relPath, name) ?: continue
-                    onMediaDetected(itemUri, name, mime, detectedPackage)
+                    onMediaDetected(itemUri, name, mime, detectedPackage, data, relPath)
 
                     if (isItemUri) break
                 }
@@ -76,7 +76,9 @@ class MediaStoreObserver(
             "camera",
             ".thumbnails",
             "download",
-            "downloads"
+            "downloads",
+            "/sent/",
+            "/sent"
         )
 
         fun isBlacklisted(data: String, relPath: String, name: String): Boolean {
@@ -87,7 +89,7 @@ class MediaStoreObserver(
         fun resolveMessagingPackage(data: String, relPath: String, name: String): String? {
             val combined = "$data/$relPath/$name".lowercase()
 
-            // 1. Explicitly ignore and skip screenshots, camera, dcim, thumbnails, downloads
+            // 1. Explicitly ignore and skip screenshots, camera, dcim, thumbnails, downloads, sent media
             if (isBlacklisted(data, relPath, name)) {
                 return null
             }
@@ -107,7 +109,8 @@ class MediaStoreObserver(
                 combined.contains("pictures/whatsapp") -> "com.whatsapp"
 
                 combined.contains("android/media/org.telegram.messenger") ||
-                combined.contains("telegram/telegram") ||
+                combined.contains("telegram/") ||
+                combined.contains("telegram images") ||
                 combined.contains("pictures/telegram") -> "org.telegram.messenger"
 
                 combined.contains("android/media/com.facebook.orca") ||

@@ -86,4 +86,34 @@ class MediaStoreObserverTest {
 
         assertNull(MediaStoreObserver.resolveMessagingPackage(path, relPath, name))
     }
+
+    @Test
+    fun testWhatsAppSentMediaIsBlacklisted() {
+        val path = "/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images/Sent/IMG-20260921-WA0001.jpg"
+        val relPath = "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images/Sent/"
+        val name = "IMG-20260921-WA0001.jpg"
+
+        assertTrue(MediaStoreObserver.isBlacklisted(path, relPath, name))
+        assertNull(MediaStoreObserver.resolveMessagingPackage(path, relPath, name))
+    }
+
+    @Test
+    fun testTelegramRootFolderWhitelisted() {
+        val path = "/storage/emulated/0/Telegram/Telegram Images/photo_20260921.jpg"
+        val relPath = "Telegram/Telegram Images/"
+        val name = "photo_20260921.jpg"
+
+        assertFalse(MediaStoreObserver.isBlacklisted(path, relPath, name))
+        assertEquals("org.telegram.messenger", MediaStoreObserver.resolveMessagingPackage(path, relPath, name))
+    }
+
+    @Test
+    fun testQrCodeScreenshotBlacklisted() {
+        val path = "/storage/emulated/0/DCIM/Screenshots/Screenshot_WhatsApp_QR_2026.png"
+        val relPath = "DCIM/Screenshots/"
+        val name = "Screenshot_WhatsApp_QR_2026.png"
+
+        assertTrue(MediaStoreObserver.isBlacklisted(path, relPath, name))
+        assertNull(MediaStoreObserver.resolveMessagingPackage(path, relPath, name))
+    }
 }

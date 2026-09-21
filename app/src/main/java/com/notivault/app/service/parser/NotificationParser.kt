@@ -286,7 +286,7 @@ object NotificationParser {
         return results
     }
 
-    private fun isMediaIndicatingText(text: String): Boolean {
+    internal fun isMediaIndicatingText(text: String): Boolean {
         val lower = text.lowercase()
         return lower.contains("photo") ||
                 lower.contains("video") ||
@@ -337,7 +337,7 @@ object NotificationParser {
                 text.contains("👁️")
     }
 
-    private fun extractNotificationMedia(extras: Bundle): Pair<Bitmap?, Icon?> {
+    internal fun extractNotificationMedia(extras: Bundle): Pair<Bitmap?, Icon?> {
         var bitmap: Bitmap? = null
         var icon: Icon? = null
 

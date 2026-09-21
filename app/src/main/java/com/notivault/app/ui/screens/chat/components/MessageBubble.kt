@@ -187,7 +187,29 @@ fun MessageBubble(
                 }
 
                 // Message Text Content
-                if (message.messageText.isNotBlank()) {
+                val cleanMsgText = message.messageText.trim()
+                val isPlaceholderText = cleanMsgText.isBlank() ||
+                        cleanMsgText.equals("📷 Sent a photo", ignoreCase = true) ||
+                        cleanMsgText.equals("Sent a photo", ignoreCase = true) ||
+                        cleanMsgText.equals("Photo", ignoreCase = true) ||
+                        cleanMsgText.equals("ছবি", ignoreCase = true) ||
+                        cleanMsgText.equals("📷", ignoreCase = true) ||
+                        cleanMsgText.equals("Video", ignoreCase = true) ||
+                        cleanMsgText.equals("🎥 Video", ignoreCase = true) ||
+                        cleanMsgText.equals("ভিডিও", ignoreCase = true)
+
+                // Only render text if: not a media placeholder when media is attached, OR media is absent
+                val shouldRenderText = if (mediaFile != null) !isPlaceholderText else cleanMsgText.isNotBlank()
+
+                if (shouldRenderText) {
+                    val displayMsgText = when {
+                        cleanMsgText.startsWith("📷 ") -> cleanMsgText.removePrefix("📷 ")
+                        cleanMsgText.startsWith("📷") -> cleanMsgText.removePrefix("📷").trim()
+                        cleanMsgText.startsWith("📸 ") -> cleanMsgText.removePrefix("📸 ")
+                        cleanMsgText.startsWith("📸") -> cleanMsgText.removePrefix("📸").trim()
+                        else -> cleanMsgText
+                    }
+
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (isPhoto && mediaFile == null) {
                             Icon(
@@ -199,7 +221,7 @@ fun MessageBubble(
                             Spacer(modifier = Modifier.width(6.dp))
                         }
                         Text(
-                            text = message.messageText,
+                            text = displayMsgText,
                             style = MaterialTheme.typography.bodyLarge,
                             color = TextPrimaryDark,
                             fontWeight = if (isDeleted) FontWeight.SemiBold else FontWeight.Normal

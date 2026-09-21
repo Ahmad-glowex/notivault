@@ -120,12 +120,25 @@ private val INJECTED_HOOK_JS = """
         if (window.__notiVaultActive) return;
         window.__notiVaultActive = true;
 
-        // 1. Intercept URL.createObjectURL for blob media
+        function isUserAuthenticated() {
+            return !!(document.getElementById('pane-side') || 
+                      document.querySelector('[aria-label="Chat list"]') ||
+                      document.querySelector('[aria-label="Chats"]') ||
+                      document.getElementById('main'));
+        }
+
+        // 1. Intercept URL.createObjectURL for blob media ONLY when authenticated
         const origCreateObjectURL = window.URL.createObjectURL;
         window.URL.createObjectURL = function(blob) {
             const url = origCreateObjectURL.call(this, blob);
             try {
+                // Do NOT capture any blobs before user logs in (blocks QR codes & login graphics)
+                if (!isUserAuthenticated()) return url;
+
                 if (blob && (blob.type.startsWith('image/') || blob.type.startsWith('video/'))) {
+                    // Ignore tiny icons / emojis / stickers (< 2 KB)
+                    if (blob.size < 2048) return url;
+
                     const reader = new FileReader();
                     reader.onloadend = function() {
                         if (reader.result && window.NotiVaultBridge) {
@@ -141,25 +154,16 @@ private val INJECTED_HOOK_JS = """
         // Single Phone Helper: Trigger 'Link with phone number'
         window.__notiVaultLinkWithPhone = function() {
             try {
-                const elements = Array.from(document.querySelectorAll('*'));
-                for (const el of elements) {
-                    if (el.children.length === 0) {
-                        const t = (el.textContent || '').trim().toLowerCase();
-                        if (t === 'link with phone number' || t.includes('link with phone number') ||
-                            t.includes('ফোন নম্বর') || t.includes('ফোন নম্বর দিয়ে') ||
-                            t.includes('vincular con') || t.includes('número de teléfono') ||
-                            t.includes('ফোন নম্বর দিয়ে লিঙ্ক') ||
-                            t.includes('ربط باستخدام رقم الهاتف') || t.includes('फोन नंबर')) {
-                            el.click();
-                            return true;
-                        }
-                    }
-                }
-                const btns = Array.from(document.querySelectorAll('span[role="button"], div[role="button"], button'));
-                for (const b of btns) {
-                    const t = (b.textContent || '').toLowerCase();
-                    if (t.includes('phone') || t.includes('ফোন') || t.includes('número')) {
-                        b.click();
+                const candidates = Array.from(document.querySelectorAll('span, div, a, button'));
+                for (const el of candidates) {
+                    const t = (el.textContent || '').trim().toLowerCase();
+                    if (t === 'link with phone number' || t.includes('link with phone number') ||
+                        t.includes('ফোন নম্বর') || t.includes('ফোন নম্বর দিয়ে') || t.includes('ফোন নম্বর দিয়ে') ||
+                        t.includes('ফোন নম্বর ব্যবহার করে') || t.includes('vincular con') ||
+                        t.includes('número de teléfono') || t.includes('conectar com número') ||
+                        t.includes('ربط باستخدام رقم الهاتف') || t.includes('फ़ोन नंबर से लिंक') || t.includes('फोन नंबर')) {
+                        const target = el.closest('button, [role="button"], a') || el;
+                        target.click();
                         return true;
                     }
                 }
@@ -167,65 +171,83 @@ private val INJECTED_HOOK_JS = """
             return false;
         };
 
+        function scanPairingCode() {
+            try {
+                const codeRegex = /\b([A-Z0-9]{4}[-\s]?[A-Z0-9]{4})\b/;
+                const containers = document.querySelectorAll('[data-link-code], [data-testid*="link-code"], [data-testid*="code"], div, span');
+                let foundCode = null;
+
+                for (const el of containers) {
+                    const attr = el.getAttribute('data-link-code') || el.getAttribute('aria-label') || '';
+                    const mAttr = attr.match(codeRegex);
+                    if (mAttr) {
+                        foundCode = mAttr[1];
+                        break;
+                    }
+
+                    if (el.children.length <= 10) {
+                        const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+                        const match = text.match(codeRegex);
+                        if (match && !text.includes('WHATSAPP') && !text.includes('DOWNLOAD')) {
+                            foundCode = match[1];
+                            break;
+                        }
+                    }
+                }
+
+                if (foundCode) {
+                    var formatted = foundCode.replace(' ', '-');
+                    if (!formatted.includes('-') && formatted.length === 8) {
+                        formatted = formatted.substring(0, 4) + '-' + formatted.substring(4);
+                    }
+                    if (window.NotiVaultBridge) {
+                        window.NotiVaultBridge.onPairingCode(formatted);
+                    }
+                }
+            } catch(e) {}
+        }
+
         // 2. Periodic DOM scanner for QR code, connection state, pairing code, and View Once elements
         function pollState() {
             try {
+                const authenticated = isUserAuthenticated();
                 const qrCanvas = document.querySelector('canvas[aria-label*="QR"], canvas[role="img"], div[data-ref]');
-                const mainChatList = document.getElementById('pane-side') || 
-                                     document.querySelector('[aria-label="Chat list"]') ||
-                                     document.querySelector('[aria-label="Chats"]');
 
-                if (mainChatList) {
+                if (authenticated) {
                     if (window.NotiVaultBridge) window.NotiVaultBridge.onStatusUpdate('AUTHENTICATED');
                 } else if (qrCanvas) {
                     if (window.NotiVaultBridge) window.NotiVaultBridge.onStatusUpdate('QR_READY');
                 }
 
-                // Scan for WhatsApp 8-character pairing code
-                const codeContainers = document.querySelectorAll('[data-link-code], [data-testid="link-code-input"], [data-testid="link-device-phone-number-code-screen"]');
-                let foundCode = null;
-                for (const c of codeContainers) {
-                    const attr = c.getAttribute('data-link-code');
-                    if (attr && attr.length >= 8) {
-                        foundCode = attr;
-                        break;
-                    }
-                }
-                if (!foundCode) {
-                    const spans = document.querySelectorAll('span, div');
-                    for (const s of spans) {
-                        if (s.children.length === 0) {
-                            const text = (s.textContent || '').trim();
-                            const match = text.match(/\b([A-Z0-9]{4}[-\s][A-Z0-9]{4})\b/);
-                            if (match) {
-                                foundCode = match[1];
-                                break;
-                            }
-                        }
-                    }
-                }
-                if (foundCode && window.NotiVaultBridge) {
-                    window.NotiVaultBridge.onPairingCode(foundCode);
+                // If not authenticated, only look for pairing code and do NOT scan/capture media!
+                if (!authenticated) {
+                    scanPairingCode();
+                    return;
                 }
 
-                // Intercept visible view once media images and videos
-                const mediaNodes = document.querySelectorAll('img[src^="blob:"], video[src^="blob:"]');
-                mediaNodes.forEach(node => {
-                    if (node.__nv_vaulted) return;
-                    node.__nv_vaulted = true;
-                    const src = node.src;
-                    if (src && src.startsWith('blob:')) {
-                        fetch(src).then(res => res.blob()).then(blob => {
-                            const reader = new FileReader();
-                            reader.onloadend = function() {
-                                if (reader.result && window.NotiVaultBridge) {
-                                    window.NotiVaultBridge.onMediaCaptured(reader.result, blob.type, true);
-                                }
-                            };
-                            reader.readAsDataURL(blob);
-                        }).catch(e => {});
-                    }
-                });
+                // Intercept visible view once media images and videos ONLY inside conversation pane (#main)
+                const conversationArea = document.getElementById('main') || document.querySelector('[data-testid="conversation-panel-body"]');
+                if (conversationArea) {
+                    const mediaNodes = conversationArea.querySelectorAll('img[src^="blob:"], video[src^="blob:"]');
+                    mediaNodes.forEach(node => {
+                        if (node.__nv_vaulted) return;
+                        if (node.tagName === 'IMG' && node.naturalWidth > 0 && node.naturalWidth < 80) return;
+                        node.__nv_vaulted = true;
+                        const src = node.src;
+                        if (src && src.startsWith('blob:')) {
+                            fetch(src).then(res => res.blob()).then(blob => {
+                                if (blob.size < 2048) return;
+                                const reader = new FileReader();
+                                reader.onloadend = function() {
+                                    if (reader.result && window.NotiVaultBridge) {
+                                        window.NotiVaultBridge.onMediaCaptured(reader.result, blob.type, true);
+                                    }
+                                };
+                                reader.readAsDataURL(blob);
+                            }).catch(e => {});
+                        }
+                    });
+                }
             } catch(e) {}
         }
 

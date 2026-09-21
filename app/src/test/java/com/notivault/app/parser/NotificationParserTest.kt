@@ -112,4 +112,20 @@ class NotificationParserTest {
         assertEquals("আহমদ", senderName)
         assertEquals("কেমন আছেন?", text)
     }
+
+    @Test
+    fun testPlainTextDoesNotTriggerMedia() {
+        assertFalse(NotificationParser.isMediaIndicatingText("Hi"))
+        assertFalse(NotificationParser.isMediaIndicatingText("Hello, how are you?"))
+        assertFalse(NotificationParser.isMediaIndicatingText("কেমন আছেন?"))
+        assertFalse(NotificationParser.isMediaIndicatingText("I will call you later"))
+    }
+
+    @Test
+    fun testMediaIndicatingKeywords() {
+        assertTrue(NotificationParser.isMediaIndicatingText("📷 Sent a photo"))
+        assertTrue(NotificationParser.isMediaIndicatingText("ছবি পাঠিয়েছেন"))
+        assertTrue(NotificationParser.isMediaIndicatingText("video"))
+        assertTrue(NotificationParser.isMediaIndicatingText("View once"))
+    }
 }

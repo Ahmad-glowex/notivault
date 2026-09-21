@@ -67,6 +67,9 @@ class ViewOnceViewModel(application: Application) : AndroidViewModel(application
     fun saveCapturedMedia(base64Data: String, mimeType: String, isViewOnce: Boolean = true) {
         viewModelScope.launch {
             try {
+                // Never capture media if not authenticated (prevents saving login QR codes & web banners)
+                if (_connectionStatus.value != "AUTHENTICATED") return@launch
+
                 val cleanMime = if (mimeType.isBlank()) "image/jpeg" else mimeType
                 val cachedFile = cacheManager.cacheBase64Data(
                     base64Data = base64Data,

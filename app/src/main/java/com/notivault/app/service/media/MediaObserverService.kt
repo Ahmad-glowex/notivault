@@ -87,8 +87,8 @@ class MediaObserverService : Service() {
 
     private fun setupObservers() {
         // 1. Setup MediaStore ContentObserver
-        val mediaStoreObserver = MediaStoreObserver(this) { uri, name, mime, packageName ->
-            handleMediaStoreChange(uri, name, mime, packageName)
+        val mediaStoreObserver = MediaStoreObserver(this) { uri, name, mime, packageName, data, relPath ->
+            handleMediaStoreChange(uri, name, mime, packageName, data, relPath)
         }
         this.mediaStoreObserver = mediaStoreObserver
         try {
@@ -182,7 +182,7 @@ class MediaObserverService : Service() {
 
                         val itemUri = Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id.toString())
                         val detectedPackage = MediaStoreObserver.resolveMessagingPackage(data, relPath, name) ?: continue
-                        handleMediaStoreChange(itemUri, name, mime, detectedPackage)
+                        handleMediaStoreChange(itemUri, name, mime, detectedPackage, data, relPath)
                     }
                 }
             } catch (e: Exception) {
@@ -236,14 +236,22 @@ class MediaObserverService : Service() {
         }
     }
 
-    private fun handleMediaStoreChange(uri: Uri, name: String, mime: String, packageName: String) {
+    private fun handleMediaStoreChange(
+        uri: Uri,
+        name: String,
+        mime: String,
+        packageName: String,
+        data: String,
+        relPath: String
+    ) {
         serviceScope.launch {
             val app = application as? NotiVaultApp ?: return@launch
             if (packageName.isBlank() || packageName == "unknown.mediastore") return@launch
-            if (MediaStoreObserver.isBlacklisted("", "", name)) return@launch
+            if (MediaStoreObserver.isBlacklisted(data, relPath, name)) return@launch
 
+            val originalPath = data.ifBlank { uri.toString() }
             // Check if already backed up before writing a new copy to disk
-            val existing = app.mediaRepository.getMediaByOriginalPath(uri.toString())
+            val existing = app.mediaRepository.getMediaByOriginalPath(originalPath)
             if (existing != null) return@launch
 
             val cachedFile = cacheManager.cacheContentUri(uri, mime, prefix = packageName.replace(".", "_"))
@@ -264,7 +272,7 @@ class MediaObserverService : Service() {
 
                 app.mediaRepository.saveCachedMedia(
                     packageName = packageName,
-                    originalPath = uri.toString(),
+                    originalPath = originalPath,
                     internalSavedPath = cachedFile.absolutePath,
                     fileName = cachedFile.name,
                     mimeType = mime,

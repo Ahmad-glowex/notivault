@@ -162,6 +162,9 @@ interface MessageDao {
     @Query("DELETE FROM messages WHERE isDeleted = 1")
     suspend fun clearAllDeletedMessages()
 
+    @Query("UPDATE messages SET hasMedia = 0, mediaUri = NULL, mediaMimeType = NULL WHERE id = :id")
+    suspend fun clearMessageMedia(id: Long)
+
     @Query("DELETE FROM messages")
     suspend fun deleteAllMessages()
 }
