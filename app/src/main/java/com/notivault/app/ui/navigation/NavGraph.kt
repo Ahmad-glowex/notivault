@@ -96,7 +96,8 @@ fun NotiVaultNavGraph(
 
         composable(Screen.ViewOnceCompanion.route) {
             ViewOnceCompanionScreen(
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToGallery = { navController.navigate(Screen.MediaGallery.route) }
             )
         }
     }

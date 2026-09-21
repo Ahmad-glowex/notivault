@@ -252,7 +252,7 @@ fun SettingsScreen(
                 }
             }
 
-            // Section 2.5: View-Once Companion Bridge
+            // Section 2.5: View-Once Vault & Auto-Sniffer Hub
             Card(
                 colors = CardDefaults.cardColors(containerColor = DarkSurface),
                 shape = RoundedCornerShape(12.dp)
@@ -267,7 +267,7 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "View-Once Companion Bridge",
+                            text = "View-Once Vault & Auto-Sniffer",
                             style = MaterialTheme.typography.titleSmall,
                             color = TextPrimaryDark,
                             fontWeight = FontWeight.Bold
@@ -275,7 +275,7 @@ fun SettingsScreen(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Capture WhatsApp & Telegram 1-time view media automatically using the Multi-Device Companion protocol without touching or tapping messages.",
+                        text = "Automatically captures WhatsApp 1-time view media using real-time binary cache sniffing & staging interceptors before sender can delete.",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondaryDark
                     )
@@ -287,7 +287,7 @@ fun SettingsScreen(
                     ) {
                         Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Open Companion Bridge & Instructions")
+                        Text("Open View-Once Hub & Controls")
                     }
                 }
             }

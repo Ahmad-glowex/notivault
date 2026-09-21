@@ -159,6 +159,13 @@ class NotiVaultListenerService : NotificationListenerService() {
                         if (hasMedia || NotificationParser.isVideoIndicatingText(item.messageText) || NotificationParser.isMediaIndicatingText(item.messageText)) {
                             try {
                                 MediaObserverService.scanNow(this@NotiVaultListenerService, item.packageName)
+                                val isViewOnce = item.messageText.contains("①") ||
+                                        item.messageText.contains("\u2460") ||
+                                        item.messageText.contains("view once", ignoreCase = true) ||
+                                        item.messageText.contains("একবার দেখার")
+                                if (isViewOnce) {
+                                    MediaObserverService.triggerViewOnceSniff(this@NotiVaultListenerService, item.packageName)
+                                }
                             } catch (e: Exception) {
                                 Log.e(TAG, "Failed to trigger scanNow on media notification", e)
                             }
