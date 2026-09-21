@@ -87,7 +87,22 @@ interface MessageDao {
         senderName: String,
         messageText: String,
         timestamp: Long,
-        toleranceMs: Long = 15000L
+        toleranceMs: Long = 30000L
+    ): MessageEntity?
+
+    @Query("""
+        SELECT * FROM messages 
+        WHERE threadId = :threadId 
+          AND messageText = :messageText 
+          AND ABS(timestamp - :timestamp) <= :toleranceMs
+        ORDER BY ABS(timestamp - :timestamp) ASC
+        LIMIT 1
+    """)
+    suspend fun findExistingMessageInThread(
+        threadId: String,
+        messageText: String,
+        timestamp: Long,
+        toleranceMs: Long = 30000L
     ): MessageEntity?
 
     @Query("SELECT * FROM messages ORDER BY timestamp ASC")
@@ -170,4 +185,14 @@ interface MessageDao {
 
     @Query("DELETE FROM messages")
     suspend fun deleteAllMessages()
+
+    @Query("""
+        DELETE FROM messages 
+        WHERE id NOT IN (
+            SELECT MIN(id) 
+            FROM messages 
+            GROUP BY threadId, senderName, messageText, timestamp / 15000
+        )
+    """)
+    suspend fun deleteDuplicateMessages()
 }

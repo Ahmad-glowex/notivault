@@ -70,13 +70,18 @@ class MessageRepositoryImpl(
             return@withContext 0L
         }
 
-        // Deduplication: Check if this exact message or duplicate within 15s tolerance exists
+        // Deduplication: Check if this exact message or duplicate within 30s tolerance exists
         val existingMsg = messageDao.findExistingMessageWithTolerance(
             threadId = threadId,
             senderName = resolvedSender,
             messageText = messageText,
             timestamp = timestamp,
-            toleranceMs = 15000L
+            toleranceMs = 30000L
+        ) ?: messageDao.findExistingMessageInThread(
+            threadId = threadId,
+            messageText = messageText,
+            timestamp = timestamp,
+            toleranceMs = 30000L
         )
         if (existingMsg != null) {
             // If new notification has media but stored one did not, update media
@@ -272,14 +277,14 @@ class MessageRepositoryImpl(
             messageDao.getAllMessagesSync()
         }
 
-        val grouped = messages.groupBy { "${it.threadId}___${it.senderName}___${it.messageText}" }
+        val grouped = messages.groupBy { "${it.threadId}___${it.messageText.trim()}" }
         for ((_, list) in grouped) {
             if (list.size <= 1) continue
             val sorted = list.sortedBy { it.timestamp }
             var baseMsg = sorted[0]
             for (i in 1 until sorted.size) {
                 val candidate = sorted[i]
-                if (Math.abs(candidate.timestamp - baseMsg.timestamp) <= 15000L) {
+                if (Math.abs(candidate.timestamp - baseMsg.timestamp) <= 30000L) {
                     // Duplicate within 15 seconds tolerance!
                     if (!candidate.mediaUri.isNullOrEmpty() && baseMsg.mediaUri.isNullOrEmpty()) {
                         messageDao.updateMessageMedia(baseMsg.id, candidate.mediaUri!!, candidate.mediaMimeType)

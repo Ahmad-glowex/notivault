@@ -42,6 +42,9 @@ class NotiVaultListenerService : NotificationListenerService() {
         // Skip ongoing notifications (e.g., media player playback, call in progress)
         if (sbn.isOngoing) return
 
+        // Unconditionally skip group summary notifications to prevent duplicate messages
+        if ((sbn.notification.flags and android.app.Notification.FLAG_GROUP_SUMMARY) != 0) return
+
         val app = application as? NotiVaultApp ?: return
 
         serviceScope.launch {
