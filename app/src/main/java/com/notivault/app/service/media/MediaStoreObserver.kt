@@ -94,30 +94,45 @@ class MediaStoreObserver(
                 return null
             }
 
-            // 2. Strict directory whitelist:
-            // - Android/media/com.whatsapp/ or WhatsApp/Media/ or Pictures/WhatsApp
-            // - Android/media/com.whatsapp.w4b/ or WhatsApp Business/Media/
-            // - Telegram/ or Android/media/org.telegram.messenger/ or Pictures/Telegram
-            // - Pictures/Messenger/ or Android/media/com.facebook.orca/
-            // - Pictures/Instagram/ or Android/media/com.instagram.android/
+            // Standard WhatsApp filename pattern (e.g. VID-2023...-WA...mp4, IMG-...-WA...jpg)
+            val lowerName = name.lowercase()
+            val isWaFileName = (lowerName.startsWith("vid-") && lowerName.contains("-wa")) ||
+                    (lowerName.startsWith("img-") && lowerName.contains("-wa")) ||
+                    (lowerName.startsWith("aud-") && lowerName.contains("-wa")) ||
+                    (lowerName.startsWith("ptt-") && lowerName.contains("-wa")) ||
+                    lowerName.startsWith("whatsapp video") ||
+                    lowerName.startsWith("whatsapp image")
+
+            // 2. Strict directory & filename whitelist:
             return when {
                 combined.contains("android/media/com.whatsapp.w4b") ||
-                combined.contains("whatsapp business/media") -> "com.whatsapp.w4b"
+                combined.contains("whatsapp business") -> "com.whatsapp.w4b"
 
                 combined.contains("android/media/com.whatsapp") ||
                 combined.contains("whatsapp/media") ||
-                combined.contains("pictures/whatsapp") -> "com.whatsapp"
+                combined.contains("pictures/whatsapp") ||
+                combined.contains("movies/whatsapp") ||
+                combined.contains("whatsapp video") ||
+                combined.contains("whatsapp images") ||
+                combined.contains("whatsapp animated gifs") ||
+                isWaFileName -> "com.whatsapp"
 
                 combined.contains("android/media/org.telegram.messenger") ||
                 combined.contains("telegram/") ||
                 combined.contains("telegram images") ||
+                combined.contains("telegram video") ||
+                combined.contains("movies/telegram") ||
                 combined.contains("pictures/telegram") -> "org.telegram.messenger"
 
                 combined.contains("android/media/com.facebook.orca") ||
-                combined.contains("pictures/messenger") -> "com.facebook.orca"
+                combined.contains("pictures/messenger") ||
+                combined.contains("movies/messenger") ||
+                combined.contains("messenger/") -> "com.facebook.orca"
 
                 combined.contains("android/media/com.instagram.android") ||
-                combined.contains("pictures/instagram") -> "com.instagram.android"
+                combined.contains("pictures/instagram") ||
+                combined.contains("movies/instagram") ||
+                combined.contains("instagram/") -> "com.instagram.android"
 
                 else -> null
             }

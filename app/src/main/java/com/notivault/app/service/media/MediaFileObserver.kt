@@ -10,15 +10,16 @@ class MediaFileObserver(
     private val onNewMediaFile: (File, String) -> Unit
 ) : FileObserver(
     directory.absolutePath,
-    CLOSE_WRITE or MOVED_TO
+    CLOSE_WRITE or MOVED_TO or CREATE
 ) {
 
     override fun onEvent(event: Int, path: String?) {
         if (path == null) return
-        if ((event and (CLOSE_WRITE or MOVED_TO)) != 0) {
+        if ((event and (CLOSE_WRITE or MOVED_TO or CREATE)) != 0) {
             val file = File(directory, path)
-            // Filter out temporary / hidden files (.nomedia, .tmp)
-            if (!file.name.startsWith(".") && file.exists() && file.isFile && file.length() > 0) {
+            // Skip .nomedia file specifically, but allow files in .Shared or hidden cache dirs
+            if (file.name.equals(".nomedia", ignoreCase = true)) return
+            if (file.exists() && file.isFile && file.length() > 0) {
                 onNewMediaFile(file, packageName)
             }
         }

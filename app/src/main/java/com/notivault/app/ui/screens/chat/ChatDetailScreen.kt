@@ -219,6 +219,10 @@ fun ChatDetailScreen(
                             message = message,
                             isGroup = thread?.isGroup ?: false,
                             onMediaClick = { path ->
+                                val isVid = message.mediaMimeType?.startsWith("video") == true ||
+                                        path.endsWith(".mp4", ignoreCase = true) ||
+                                        path.endsWith(".mkv", ignoreCase = true) ||
+                                        path.endsWith(".3gp", ignoreCase = true)
                                 viewingMedia = MediaEntity(
                                     id = message.id,
                                     threadId = message.threadId,
@@ -226,10 +230,10 @@ fun ChatDetailScreen(
                                     originalPath = path,
                                     internalSavedPath = path,
                                     fileName = File(path).name,
-                                    mimeType = message.mediaMimeType ?: "image/jpeg",
+                                    mimeType = message.mediaMimeType ?: if (isVid) "video/mp4" else "image/jpeg",
                                     fileSizeBytes = File(path).length(),
                                     timestamp = message.timestamp,
-                                    mediaType = "IMAGE"
+                                    mediaType = if (isVid) "VIDEO" else "IMAGE"
                                 )
                             }
                         )

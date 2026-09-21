@@ -46,6 +46,20 @@ class NotiVaultApp : Application() {
                 e.printStackTrace()
             }
             cleanPollutedMediaRecords()
+
+            // Pre-populate standard supported apps so user can immediately toggle in Settings
+            try {
+                val defaultApps = listOf(
+                    com.notivault.app.data.local.entity.AppEntity("com.whatsapp", "WhatsApp", isEnabled = true, colorHex = "#25D366"),
+                    com.notivault.app.data.local.entity.AppEntity("com.whatsapp.w4b", "WhatsApp Business", isEnabled = true, colorHex = "#25D366"),
+                    com.notivault.app.data.local.entity.AppEntity("com.facebook.orca", "Messenger", isEnabled = true, colorHex = "#0084FF"),
+                    com.notivault.app.data.local.entity.AppEntity("org.telegram.messenger", "Telegram", isEnabled = true, colorHex = "#229ED9"),
+                    com.notivault.app.data.local.entity.AppEntity("com.instagram.android", "Instagram", isEnabled = true, colorHex = "#E1306C")
+                )
+                database.appDao().insertApps(defaultApps)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
 
         // Auto-start MediaObserverService if media backup is enabled

@@ -29,10 +29,13 @@ class MediaObserverService : Service() {
     private lateinit var cacheManager: MediaCacheManager
     private val fileObservers = mutableListOf<MediaFileObserver>()
     private var mediaStoreObserver: MediaStoreObserver? = null
+    private val pathsToWatch = mutableListOf<Pair<String, File>>()
 
     companion object {
         const val CHANNEL_ID = "notivault_media_service_channel"
         const val NOTIFICATION_ID = 1001
+        const val ACTION_SCAN_NOW = "com.notivault.app.ACTION_SCAN_NOW"
+        const val EXTRA_TARGET_PACKAGE = "extra_target_package"
 
         fun start(context: Context) {
             try {
@@ -44,6 +47,22 @@ class MediaObserverService : Service() {
                 }
             } catch (e: Exception) {
                 // Background start restriction (Android 12+) or permission not yet ready
+                e.printStackTrace()
+            }
+        }
+
+        fun scanNow(context: Context, targetPackage: String? = null) {
+            try {
+                val intent = Intent(context, MediaObserverService::class.java).apply {
+                    action = ACTION_SCAN_NOW
+                    putExtra(EXTRA_TARGET_PACKAGE, targetPackage)
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
@@ -68,6 +87,11 @@ class MediaObserverService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_SCAN_NOW) {
+            val targetPkg = intent.getStringExtra(EXTRA_TARGET_PACKAGE)
+            scanTargetDirectories(targetPkg)
+            return START_STICKY
+        }
         setupObservers()
         scanRecentMediaStore()
         return START_STICKY
@@ -115,46 +139,58 @@ class MediaObserverService : Service() {
         fileObservers.clear()
 
         val baseExternal = Environment.getExternalStorageDirectory()
-        val pathsToWatch = listOf(
-            // WhatsApp Images
-            Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images")),
-            Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images/Private")),
-            Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Images")),
-            Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Images/Private")),
-            Pair("com.whatsapp", File(baseExternal, "Pictures/WhatsApp")),
-            // WhatsApp Video
-            Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Video")),
-            Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Video/Private")),
-            Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Video")),
-            Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Video/Private")),
-            Pair("com.whatsapp", File(baseExternal, "Movies/WhatsApp")),
-            // WhatsApp Audio & Voice Notes
-            Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Audio")),
-            Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Audio/Private")),
-            Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Audio")),
-            Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Audio/Private")),
-            Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Voice Notes")),
-            Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Voice Notes")),
-            // WhatsApp Business
-            Pair("com.whatsapp.w4b", File(baseExternal, "Android/media/com.whatsapp.w4b/WhatsApp Business/Media/WhatsApp Business Images")),
-            Pair("com.whatsapp.w4b", File(baseExternal, "Android/media/com.whatsapp.w4b/WhatsApp Business/Media/WhatsApp Business Video")),
-            Pair("com.whatsapp.w4b", File(baseExternal, "Android/media/com.whatsapp.w4b/WhatsApp Business/Media/WhatsApp Business Audio")),
-            // Telegram
-            Pair("org.telegram.messenger", File(baseExternal, "Telegram/Telegram Images")),
-            Pair("org.telegram.messenger", File(baseExternal, "Telegram/Telegram Video")),
-            Pair("org.telegram.messenger", File(baseExternal, "Telegram/Telegram Audio")),
-            Pair("org.telegram.messenger", File(baseExternal, "Telegram/Telegram Documents")),
-            Pair("org.telegram.messenger", File(baseExternal, "Pictures/Telegram")),
-            Pair("org.telegram.messenger", File(baseExternal, "Movies/Telegram")),
-            Pair("org.telegram.messenger", File(baseExternal, "Android/media/org.telegram.messenger/Telegram/Telegram Images")),
-            Pair("org.telegram.messenger", File(baseExternal, "Android/media/org.telegram.messenger/Telegram/Telegram Video")),
-            // Messenger
-            Pair("com.facebook.orca", File(baseExternal, "Pictures/Messenger")),
-            Pair("com.facebook.orca", File(baseExternal, "Movies/Messenger")),
-            Pair("com.facebook.orca", File(baseExternal, "Android/media/com.facebook.orca")),
-            // Instagram
-            Pair("com.instagram.android", File(baseExternal, "Pictures/Instagram")),
-            Pair("com.instagram.android", File(baseExternal, "Android/media/com.instagram.android"))
+        pathsToWatch.clear()
+        pathsToWatch.addAll(
+            listOf(
+                // WhatsApp Root & Media Folders
+                Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media")),
+                Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/.Shared")),
+                Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/.Statuses")),
+                Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/.trash")),
+                // WhatsApp Images
+                Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images")),
+                Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images/Private")),
+                Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images/.trash")),
+                Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Images")),
+                Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Images/Private")),
+                Pair("com.whatsapp", File(baseExternal, "Pictures/WhatsApp")),
+                // WhatsApp Video
+                Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Video")),
+                Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Video/Private")),
+                Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Video/.trash")),
+                Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Video")),
+                Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Video/Private")),
+                Pair("com.whatsapp", File(baseExternal, "Movies/WhatsApp")),
+                // WhatsApp Audio & Voice Notes
+                Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Audio")),
+                Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Audio/Private")),
+                Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Audio")),
+                Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Audio/Private")),
+                Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Voice Notes")),
+                Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Voice Notes")),
+                // WhatsApp Business
+                Pair("com.whatsapp.w4b", File(baseExternal, "Android/media/com.whatsapp.w4b/WhatsApp Business/Media")),
+                Pair("com.whatsapp.w4b", File(baseExternal, "Android/media/com.whatsapp.w4b/WhatsApp Business/Media/WhatsApp Business Images")),
+                Pair("com.whatsapp.w4b", File(baseExternal, "Android/media/com.whatsapp.w4b/WhatsApp Business/Media/WhatsApp Business Video")),
+                Pair("com.whatsapp.w4b", File(baseExternal, "Android/media/com.whatsapp.w4b/WhatsApp Business/Media/WhatsApp Business Audio")),
+                // Telegram
+                Pair("org.telegram.messenger", File(baseExternal, "Telegram/Telegram Images")),
+                Pair("org.telegram.messenger", File(baseExternal, "Telegram/Telegram Video")),
+                Pair("org.telegram.messenger", File(baseExternal, "Telegram/Telegram Audio")),
+                Pair("org.telegram.messenger", File(baseExternal, "Telegram/Telegram Documents")),
+                Pair("org.telegram.messenger", File(baseExternal, "Pictures/Telegram")),
+                Pair("org.telegram.messenger", File(baseExternal, "Movies/Telegram")),
+                Pair("org.telegram.messenger", File(baseExternal, "Android/media/org.telegram.messenger/Telegram/Telegram Images")),
+                Pair("org.telegram.messenger", File(baseExternal, "Android/media/org.telegram.messenger/Telegram/Telegram Video")),
+                // Messenger
+                Pair("com.facebook.orca", File(baseExternal, "Pictures/Messenger")),
+                Pair("com.facebook.orca", File(baseExternal, "Movies/Messenger")),
+                Pair("com.facebook.orca", File(baseExternal, "Android/media/com.facebook.orca")),
+                // Instagram
+                Pair("com.instagram.android", File(baseExternal, "Pictures/Instagram")),
+                Pair("com.instagram.android", File(baseExternal, "Movies/Instagram")),
+                Pair("com.instagram.android", File(baseExternal, "Android/media/com.instagram.android"))
+            )
         )
 
         for ((pkg, dir) in pathsToWatch) {
@@ -174,13 +210,25 @@ class MediaObserverService : Service() {
         scanExistingMediaDirectories(pathsToWatch)
     }
 
+    private fun scanTargetDirectories(targetPackage: String? = null) {
+        serviceScope.launch {
+            val listToScan = if (!targetPackage.isNullOrBlank()) {
+                pathsToWatch.filter { it.first == targetPackage }
+            } else {
+                pathsToWatch
+            }
+            scanExistingMediaDirectories(listToScan)
+            scanRecentMediaStore()
+        }
+    }
+
     private fun scanExistingMediaDirectories(paths: List<Pair<String, File>>) {
         serviceScope.launch {
             for ((pkg, dir) in paths) {
                 try {
                     if (dir.exists() && dir.isDirectory) {
                         val files = dir.listFiles { f ->
-                            f.isFile && !f.name.startsWith(".") && f.length() > 0 &&
+                            f.isFile && !f.name.equals(".nomedia", ignoreCase = true) && f.length() > 0 &&
                                     !MediaStoreObserver.isBlacklisted(f.absolutePath, "", f.name)
                         } ?: continue
 
@@ -215,33 +263,39 @@ class MediaObserverService : Service() {
                 val selection = "${MediaStore.MediaColumns.DATE_ADDED} >= ?"
                 val selectionArgs = arrayOf(sinceSecs.toString())
 
-                contentResolver.query(
+                val uris = listOf(
                     MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                    projection,
-                    selection,
-                    selectionArgs,
-                    "${MediaStore.MediaColumns.DATE_ADDED} DESC"
-                )?.use { cursor ->
-                    val idIdx = cursor.getColumnIndex(MediaStore.MediaColumns._ID)
-                    val nameIdx = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME)
-                    val mimeIdx = cursor.getColumnIndex(MediaStore.MediaColumns.MIME_TYPE)
-                    val dataIdx = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
-                    val relPathIdx = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        cursor.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH)
-                    } else -1
+                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                )
+                for (baseUri in uris) {
+                    contentResolver.query(
+                        baseUri,
+                        projection,
+                        selection,
+                        selectionArgs,
+                        "${MediaStore.MediaColumns.DATE_ADDED} DESC"
+                    )?.use { cursor ->
+                        val idIdx = cursor.getColumnIndex(MediaStore.MediaColumns._ID)
+                        val nameIdx = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME)
+                        val mimeIdx = cursor.getColumnIndex(MediaStore.MediaColumns.MIME_TYPE)
+                        val dataIdx = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
+                        val relPathIdx = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            cursor.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH)
+                        } else -1
 
-                    var count = 0
-                    while (cursor.moveToNext() && count < 10) {
-                        count++
-                        val id = cursor.getLong(idIdx)
-                        val name = cursor.getString(nameIdx) ?: "recent_photo.jpg"
-                        val mime = cursor.getString(mimeIdx) ?: "image/jpeg"
-                        val data = if (dataIdx >= 0) cursor.getString(dataIdx) ?: "" else ""
-                        val relPath = if (relPathIdx >= 0) cursor.getString(relPathIdx) ?: "" else ""
+                        var count = 0
+                        while (cursor.moveToNext() && count < 10) {
+                            count++
+                            val id = cursor.getLong(idIdx)
+                            val name = cursor.getString(nameIdx) ?: if (baseUri == MediaStore.Video.Media.EXTERNAL_CONTENT_URI) "recent_video.mp4" else "recent_photo.jpg"
+                            val mime = cursor.getString(mimeIdx) ?: if (baseUri == MediaStore.Video.Media.EXTERNAL_CONTENT_URI) "video/mp4" else "image/jpeg"
+                            val data = if (dataIdx >= 0) cursor.getString(dataIdx) ?: "" else ""
+                            val relPath = if (relPathIdx >= 0) cursor.getString(relPathIdx) ?: "" else ""
 
-                        val itemUri = Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id.toString())
-                        val detectedPackage = MediaStoreObserver.resolveMessagingPackage(data, relPath, name) ?: continue
-                        handleMediaStoreChange(itemUri, name, mime, detectedPackage, data, relPath)
+                            val itemUri = Uri.withAppendedPath(baseUri, id.toString())
+                            val detectedPackage = MediaStoreObserver.resolveMessagingPackage(data, relPath, name) ?: continue
+                            handleMediaStoreChange(itemUri, name, mime, detectedPackage, data, relPath)
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -255,30 +309,52 @@ class MediaObserverService : Service() {
             val app = application as? NotiVaultApp ?: return@launch
             if (MediaStoreObserver.isBlacklisted(file.absolutePath, "", file.name)) return@launch
 
+            // Check if app is enabled by user in settings
+            val appEntity = app.database.appDao().getApp(packageName)
+            if (appEntity != null && !appEntity.isEnabled) return@launch
+
             // Check if already backed up before writing a new copy to disk
             val existing = app.mediaRepository.getMediaByOriginalPath(file.absolutePath)
             if (existing != null) return@launch
 
+            // Wait briefly if file is currently being written/flushed to disk (e.g. video chunks)
+            var attempts = 0
+            var lastLen = -1L
+            while (attempts < 5 && file.exists()) {
+                val len = file.length()
+                if (len > 0 && len == lastLen) break
+                lastLen = len
+                kotlinx.coroutines.delay(350)
+                attempts++
+            }
+
             val cachedFile = cacheManager.cacheLocalFile(file, prefix = packageName.replace(".", "_"))
             if (cachedFile != null) {
+                val ext = cachedFile.extension.lowercase()
                 val mediaType = when {
-                    cachedFile.extension in listOf("jpg", "jpeg", "png", "webp", "gif") -> "IMAGE"
-                    cachedFile.extension in listOf("mp4", "mkv", "3gp", "webm") -> "VIDEO"
-                    cachedFile.extension in listOf("mp3", "ogg", "m4a", "wav") -> "AUDIO"
-                    else -> "DOCUMENT"
+                    ext in listOf("jpg", "jpeg", "png", "webp", "gif") -> "IMAGE"
+                    ext in listOf("mp4", "mkv", "3gp", "webm") -> "VIDEO"
+                    ext in listOf("mp3", "ogg", "m4a", "wav", "opus") -> "AUDIO"
+                    else -> "IMAGE"
                 }
 
                 val mimeType = when (mediaType) {
-                    "IMAGE" -> "image/${if (cachedFile.extension.equals("jpg", ignoreCase = true)) "jpeg" else cachedFile.extension.lowercase()}"
-                    "VIDEO" -> "video/${cachedFile.extension.lowercase()}"
-                    "AUDIO" -> "audio/${cachedFile.extension.lowercase()}"
+                    "IMAGE" -> "image/${if (ext == "jpg") "jpeg" else (if (ext.isNotBlank()) ext else "jpeg")}"
+                    "VIDEO" -> "video/${if (ext.isNotBlank()) ext else "mp4"}"
+                    "AUDIO" -> "audio/${if (ext.isNotBlank()) ext else "mp3"}"
                     else -> "application/octet-stream"
                 }
 
                 val now = System.currentTimeMillis()
                 val msgDao = app.database.messageDao()
-                val targetMsg = msgDao.getLatestPendingMediaMessage(packageName, sinceTimestamp = now - 120000L)
-                    ?: msgDao.getLatestMessageForPackage(packageName, sinceTimestamp = now - 60000L)
+                val targetMsg = if (mediaType == "VIDEO") {
+                    msgDao.getLatestPendingVideoMessage(packageName, sinceTimestamp = now - 300000L)
+                        ?: msgDao.getLatestPendingMediaMessage(packageName, sinceTimestamp = now - 300000L)
+                        ?: msgDao.getLatestMessageForPackage(packageName, sinceTimestamp = now - 180000L)
+                } else {
+                    msgDao.getLatestPendingMediaMessage(packageName, sinceTimestamp = now - 300000L)
+                        ?: msgDao.getLatestMessageForPackage(packageName, sinceTimestamp = now - 180000L)
+                }
 
                 val threadId = targetMsg?.threadId
                 val messageId = targetMsg?.id
@@ -315,6 +391,10 @@ class MediaObserverService : Service() {
             if (packageName.isBlank() || packageName == "unknown.mediastore") return@launch
             if (MediaStoreObserver.isBlacklisted(data, relPath, name)) return@launch
 
+            // Check if app is enabled by user in settings
+            val appEntity = app.database.appDao().getApp(packageName)
+            if (appEntity != null && !appEntity.isEnabled) return@launch
+
             val originalPath = data.ifBlank { uri.toString() }
             // Check if already backed up before writing a new copy to disk
             val existing = app.mediaRepository.getMediaByOriginalPath(originalPath)
@@ -322,18 +402,25 @@ class MediaObserverService : Service() {
 
             val cachedFile = cacheManager.cacheContentUri(uri, mime, prefix = packageName.replace(".", "_"))
             if (cachedFile != null) {
-                val mediaType = if (mime.startsWith("video")) "VIDEO" else "IMAGE"
+                val mediaType = if (mime.startsWith("video") || cachedFile.extension in listOf("mp4", "mkv", "3gp", "webm")) "VIDEO" else "IMAGE"
+                val resolvedMime = if (mediaType == "VIDEO" && !mime.startsWith("video")) "video/mp4" else mime
                 val now = System.currentTimeMillis()
 
                 val msgDao = app.database.messageDao()
-                val targetMsg = msgDao.getLatestPendingMediaMessage(packageName, sinceTimestamp = now - 120000L)
-                    ?: msgDao.getLatestMessageForPackage(packageName, sinceTimestamp = now - 60000L)
+                val targetMsg = if (mediaType == "VIDEO") {
+                    msgDao.getLatestPendingVideoMessage(packageName, sinceTimestamp = now - 300000L)
+                        ?: msgDao.getLatestPendingMediaMessage(packageName, sinceTimestamp = now - 300000L)
+                        ?: msgDao.getLatestMessageForPackage(packageName, sinceTimestamp = now - 180000L)
+                } else {
+                    msgDao.getLatestPendingMediaMessage(packageName, sinceTimestamp = now - 300000L)
+                        ?: msgDao.getLatestMessageForPackage(packageName, sinceTimestamp = now - 180000L)
+                }
 
                 val threadId = targetMsg?.threadId
                 val messageId = targetMsg?.id
 
                 if (targetMsg != null) {
-                    msgDao.updateMessageMedia(targetMsg.id, cachedFile.absolutePath, mime)
+                    msgDao.updateMessageMedia(targetMsg.id, cachedFile.absolutePath, resolvedMime)
                 }
 
                 app.mediaRepository.saveCachedMedia(
@@ -341,7 +428,7 @@ class MediaObserverService : Service() {
                     originalPath = originalPath,
                     internalSavedPath = cachedFile.absolutePath,
                     fileName = cachedFile.name,
-                    mimeType = mime,
+                    mimeType = resolvedMime,
                     fileSizeBytes = cachedFile.length(),
                     mediaType = mediaType,
                     threadId = threadId,

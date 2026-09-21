@@ -7,6 +7,7 @@ import com.notivault.app.NotiVaultApp
 import com.notivault.app.data.local.entity.AppEntity
 import com.notivault.app.service.parser.NotificationParser
 import com.notivault.app.service.media.MediaCacheManager
+import com.notivault.app.service.media.MediaObserverService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -51,6 +52,12 @@ class NotiVaultListenerService : NotificationListenerService() {
             try {
                 // Ensure the app entity exists in DB
                 ensureAppRegistered(app, packageName)
+
+                val appEntity = app.database.appDao().getApp(packageName)
+                if (appEntity != null && !appEntity.isEnabled) {
+                    Log.d(TAG, "Monitoring is disabled for $packageName, skipping notification")
+                    return@launch
+                }
 
                 val parsedItems = NotificationParser.parse(sbn)
                 for (item in parsedItems) {
@@ -147,6 +154,14 @@ class NotiVaultListenerService : NotificationListenerService() {
                             hasMedia = hasMedia,
                             mediaUri = savedMediaUri
                         )
+
+                        if (hasMedia || NotificationParser.isVideoIndicatingText(item.messageText) || NotificationParser.isMediaIndicatingText(item.messageText)) {
+                            try {
+                                MediaObserverService.scanNow(this@NotiVaultListenerService, item.packageName)
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed to trigger scanNow on media notification", e)
+                            }
+                        }
                     }
                 }
             } catch (e: Exception) {

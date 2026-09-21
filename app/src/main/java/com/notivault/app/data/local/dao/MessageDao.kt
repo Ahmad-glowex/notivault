@@ -138,7 +138,18 @@ interface MessageDao {
     @Query("""
         SELECT * FROM messages 
         WHERE packageName = :packageName 
-          AND (hasMedia = 1 OR messageText LIKE '%photo%' OR messageText LIKE '%image%' OR messageText LIKE '%video%' OR messageText LIKE '%📷%') 
+          AND (mediaMimeType LIKE 'video%' OR messageText LIKE '%video%' OR messageText LIKE '%ভিডিও%' OR messageText LIKE '%🎥%' OR messageText LIKE '%🎬%') 
+          AND (mediaUri IS NULL OR mediaUri = '') 
+          AND timestamp >= :sinceTimestamp 
+        ORDER BY timestamp DESC 
+        LIMIT 1
+    """)
+    suspend fun getLatestPendingVideoMessage(packageName: String, sinceTimestamp: Long): MessageEntity?
+
+    @Query("""
+        SELECT * FROM messages 
+        WHERE packageName = :packageName 
+          AND (hasMedia = 1 OR messageText LIKE '%photo%' OR messageText LIKE '%image%' OR messageText LIKE '%video%' OR messageText LIKE '%ভিডিও%' OR messageText LIKE '%ছবি%' OR messageText LIKE '%📷%' OR messageText LIKE '%🎥%' OR messageText LIKE '%①%' OR messageText LIKE '%view once%') 
           AND (mediaUri IS NULL OR mediaUri = '') 
           AND timestamp >= :sinceTimestamp 
         ORDER BY timestamp DESC 

@@ -59,11 +59,15 @@ object NotificationParser {
                 val mediaType = msg.dataMimeType
 
                 val isLatest = (i == messages.size - 1)
-                val hasAttachedMedia = mediaUri != null || (isLatest && (extraBitmap != null || extraIcon != null))
+                val isVideo = isVideoIndicatingText(msgText) || (isLatest && isVideoIndicatingText(fallbackText))
+                val isMediaText = isMediaIndicatingText(msgText) || (isLatest && isMediaIndicatingText(fallbackText)) || msgText.contains("①")
+                val hasAttachedMedia = mediaUri != null || (isLatest && (extraBitmap != null || extraIcon != null)) || isMediaText
 
                 if (msgText.isBlank() && hasAttachedMedia) {
                     msgText = if (fallbackText.isNotBlank() && isMediaIndicatingText(fallbackText)) {
                         fallbackText
+                    } else if (isVideo) {
+                        "🎥 Sent a video"
                     } else {
                         "📷 Sent a photo"
                     }
@@ -87,19 +91,26 @@ object NotificationParser {
 
                 val msgBitmap = if (isLatest) extraBitmap else null
                 val msgIcon = if (isLatest && msgBitmap == null) extraIcon else null
+                val resolvedMediaType = when {
+                    mediaType != null -> mediaType
+                    isVideo -> "video/mp4"
+                    msgBitmap != null || msgIcon != null -> "image/jpeg"
+                    isMediaText -> "image/jpeg"
+                    else -> null
+                }
 
                 results.add(
                     ParsedNotification(
                         packageName = packageName,
                         chatTitle = chatTitle,
                         senderName = resolvedSender,
-                        messageText = msgText.ifEmpty { if (hasAttachedMedia) "📷 Sent a photo" else "" },
+                        messageText = msgText.ifEmpty { if (hasAttachedMedia) (if (isVideo) "🎥 Sent a video" else "📷 Sent a photo") else "" },
                         timestamp = msgTimestamp,
                         notificationKey = key,
                         isGroup = isGroup,
                         isDeletedNotice = isDeleted,
                         hasMedia = hasAttachedMedia,
-                        mediaType = mediaType ?: if (msgBitmap != null || msgIcon != null) "image/jpeg" else null,
+                        mediaType = resolvedMediaType,
                         mediaBitmap = msgBitmap,
                         mediaIcon = msgIcon,
                         mediaDataUri = mediaUri
@@ -124,11 +135,15 @@ object NotificationParser {
                         val mediaType = item.getString("dataMimeType")
 
                         val isLatest = (i == messagesArray.size - 1)
-                        val hasAttachedMedia = mediaUri != null || (isLatest && (extraBitmap != null || extraIcon != null))
+                        val isVideo = isVideoIndicatingText(msgText) || (isLatest && isVideoIndicatingText(fallbackText))
+                        val isMediaText = isMediaIndicatingText(msgText) || (isLatest && isMediaIndicatingText(fallbackText)) || msgText.contains("①")
+                        val hasAttachedMedia = mediaUri != null || (isLatest && (extraBitmap != null || extraIcon != null)) || isMediaText
 
                         if (msgText.isBlank() && hasAttachedMedia) {
                             msgText = if (fallbackText.isNotBlank() && isMediaIndicatingText(fallbackText)) {
                                 fallbackText
+                            } else if (isVideo) {
+                                "🎥 Sent a video"
                             } else {
                                 "📷 Sent a photo"
                             }
@@ -158,19 +173,26 @@ object NotificationParser {
 
                         val msgBitmap = if (isLatest) extraBitmap else null
                         val msgIcon = if (isLatest && msgBitmap == null) extraIcon else null
+                        val resolvedMediaType = when {
+                            mediaType != null -> mediaType
+                            isVideo -> "video/mp4"
+                            msgBitmap != null || msgIcon != null -> "image/jpeg"
+                            isMediaText -> "image/jpeg"
+                            else -> null
+                        }
 
                         results.add(
                             ParsedNotification(
                                 packageName = packageName,
                                 chatTitle = chatTitle,
                                 senderName = resolvedSender,
-                                messageText = msgText.ifEmpty { if (hasAttachedMedia) "📷 Sent a photo" else "" },
+                                messageText = msgText.ifEmpty { if (hasAttachedMedia) (if (isVideo) "🎥 Sent a video" else "📷 Sent a photo") else "" },
                                 timestamp = msgTimestamp,
                                 notificationKey = key,
                                 isGroup = isGroupExtra,
                                 isDeletedNotice = isDeleted,
                                 hasMedia = hasAttachedMedia,
-                                mediaType = mediaType ?: if (msgBitmap != null || msgIcon != null) "image/jpeg" else null,
+                                mediaType = resolvedMediaType,
                                 mediaBitmap = msgBitmap,
                                 mediaIcon = msgIcon,
                                 mediaDataUri = mediaUri
@@ -207,22 +229,29 @@ object NotificationParser {
                         lineSender
                     }
 
-                    val hasAttachedMedia = isLatest && (extraBitmap != null || extraIcon != null)
+                    val isVideo = isVideoIndicatingText(lineText)
+                    val isMediaText = isMediaIndicatingText(lineText) || lineText.contains("①")
+                    val hasAttachedMedia = (isLatest && (extraBitmap != null || extraIcon != null)) || isMediaText
                     val msgBitmap = if (isLatest) extraBitmap else null
                     val msgIcon = if (isLatest && msgBitmap == null) extraIcon else null
+                    val resolvedMediaType = when {
+                        isVideo -> "video/mp4"
+                        hasAttachedMedia -> "image/jpeg"
+                        else -> null
+                    }
 
                     results.add(
                         ParsedNotification(
                             packageName = packageName,
                             chatTitle = if (lineChatTitle.isNotBlank() && lineChatTitle != "Direct Message") lineChatTitle else chatTitle,
                             senderName = resolvedSender,
-                            messageText = lineText.ifEmpty { if (hasAttachedMedia) "📷 Sent a photo" else "" },
+                            messageText = lineText.ifEmpty { if (hasAttachedMedia) (if (isVideo) "🎥 Sent a video" else "📷 Sent a photo") else "" },
                             timestamp = postTime - (lineCount - 1 - i) * 1000L,
                             notificationKey = key,
                             isGroup = isGroupExtra,
                             isDeletedNotice = isDeleted,
                             hasMedia = hasAttachedMedia,
-                            mediaType = if (hasAttachedMedia) "image/jpeg" else null,
+                            mediaType = resolvedMediaType,
                             mediaBitmap = msgBitmap,
                             mediaIcon = msgIcon,
                             mediaDataUri = null
@@ -250,20 +279,27 @@ object NotificationParser {
                     senderName
                 }
 
-                val hasAttachedMedia = extraBitmap != null || extraIcon != null
+                val isVideo = isVideoIndicatingText(cleanText) || isVideoIndicatingText(fallbackText)
+                val isMediaText = isMediaIndicatingText(cleanText) || isMediaIndicatingText(fallbackText) || cleanText.contains("①")
+                val hasAttachedMedia = extraBitmap != null || extraIcon != null || isMediaText
+                val resolvedMediaType = when {
+                    isVideo -> "video/mp4"
+                    hasAttachedMedia -> "image/jpeg"
+                    else -> null
+                }
 
                 results.add(
                     ParsedNotification(
                         packageName = packageName,
                         chatTitle = chatTitle,
                         senderName = resolvedSender,
-                        messageText = cleanText.ifEmpty { if (hasAttachedMedia) "📷 Sent a photo" else "" },
+                        messageText = cleanText.ifEmpty { if (hasAttachedMedia) (if (isVideo) "🎥 Sent a video" else "📷 Sent a photo") else "" },
                         timestamp = postTime,
                         notificationKey = key,
                         isGroup = isGroupExtra,
                         isDeletedNotice = isDeleted,
                         hasMedia = hasAttachedMedia,
-                        mediaType = if (hasAttachedMedia) "image/jpeg" else null,
+                        mediaType = resolvedMediaType,
                         mediaBitmap = extraBitmap,
                         mediaIcon = extraIcon,
                         mediaDataUri = null
@@ -275,6 +311,20 @@ object NotificationParser {
         return results
     }
 
+    internal fun isVideoIndicatingText(text: String): Boolean {
+        val lower = text.lowercase()
+        return lower.contains("video") ||
+                lower.contains("ভিডিও") ||
+                lower.contains("वीडियो") ||
+                lower.contains("فيديو") ||
+                lower.contains("видео") ||
+                lower.contains("vidéo") ||
+                lower.contains("视频") ||
+                lower.contains("動画") ||
+                text.contains("🎥") ||
+                text.contains("🎬")
+    }
+
     internal fun isMediaIndicatingText(text: String): Boolean {
         val lower = text.lowercase()
         return lower.contains("photo") ||
@@ -283,6 +333,9 @@ object NotificationParser {
                 lower.contains("voice message") ||
                 lower.contains("view once") ||
                 lower.contains("opened") ||
+                // View Once circled 1
+                text.contains("①") ||
+                text.contains("\u2460") ||
                 // Bengali
                 lower.contains("ছবি") ||
                 lower.contains("ভিডিও") ||

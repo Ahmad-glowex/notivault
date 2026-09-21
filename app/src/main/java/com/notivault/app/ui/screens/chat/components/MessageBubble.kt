@@ -72,14 +72,22 @@ fun MessageBubble(
     val timeFormatted = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(message.timestamp))
     val mediaFile = message.mediaUri?.let { File(it) }?.takeIf { it.exists() }
     val isVideo = message.mediaMimeType?.startsWith("video") == true ||
-            message.mediaUri?.endsWith(".mp4", ignoreCase = true) == true
+            message.mediaUri?.endsWith(".mp4", ignoreCase = true) == true ||
+            message.mediaUri?.endsWith(".mkv", ignoreCase = true) == true ||
+            message.mediaUri?.endsWith(".3gp", ignoreCase = true) == true
 
     val isViewOnce = message.messageText.contains("view once", ignoreCase = true) ||
             message.messageText.contains("opened", ignoreCase = true) ||
             message.messageText.contains("ভিউ ওয়ান্স", ignoreCase = true) ||
-            message.messageText.contains("একবার দেখার", ignoreCase = true)
+            message.messageText.contains("একবার দেখার", ignoreCase = true) ||
+            message.messageText.contains("①") ||
+            message.messageText.contains("\u2460")
     val isPhoto = message.messageText.contains("photo", ignoreCase = true) ||
-            message.messageText.contains("📷") || message.messageText.contains("ছবি")
+            message.messageText.contains("📷") || message.messageText.contains("ছবি") ||
+            message.messageText.contains("📸")
+    val isVideoMsg = message.messageText.contains("video", ignoreCase = true) ||
+            message.messageText.contains("🎥") || message.messageText.contains("ভিডিও") ||
+            message.messageText.contains("🎬")
 
     val bubbleShape = RoundedCornerShape(
         topStart = 16.dp,
@@ -216,14 +224,24 @@ fun MessageBubble(
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (isPhoto && mediaFile == null) {
-                            Icon(
-                                imageVector = Icons.Default.CameraAlt,
-                                contentDescription = null,
-                                tint = TealSecondary,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
+                        if (mediaFile == null) {
+                            if (isVideoMsg) {
+                                Icon(
+                                    imageVector = Icons.Default.Videocam,
+                                    contentDescription = null,
+                                    tint = TealSecondary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                            } else if (isPhoto) {
+                                Icon(
+                                    imageVector = Icons.Default.CameraAlt,
+                                    contentDescription = null,
+                                    tint = TealSecondary,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                            }
                         }
                         Text(
                             text = displayMsgText,
