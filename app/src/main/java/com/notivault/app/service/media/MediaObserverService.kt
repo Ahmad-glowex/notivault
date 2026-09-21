@@ -35,17 +35,26 @@ class MediaObserverService : Service() {
         const val NOTIFICATION_ID = 1001
 
         fun start(context: Context) {
-            val intent = Intent(context, MediaObserverService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                val intent = Intent(context, MediaObserverService::class.java)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
+                // Background start restriction (Android 12+) or permission not yet ready
+                e.printStackTrace()
             }
         }
 
         fun stop(context: Context) {
-            val intent = Intent(context, MediaObserverService::class.java)
-            context.stopService(intent)
+            try {
+                val intent = Intent(context, MediaObserverService::class.java)
+                context.stopService(intent)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -55,6 +64,7 @@ class MediaObserverService : Service() {
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildForegroundNotification())
         setupObservers()
+        scanRecentMediaStore()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -77,8 +87,8 @@ class MediaObserverService : Service() {
 
     private fun setupObservers() {
         // 1. Setup MediaStore ContentObserver
-        val mediaStoreObserver = MediaStoreObserver(this) { uri, name, mime ->
-            handleMediaStoreChange(uri, name, mime)
+        val mediaStoreObserver = MediaStoreObserver(this) { uri, name, mime, packageName ->
+            handleMediaStoreChange(uri, name, mime, packageName)
         }
         this.mediaStoreObserver = mediaStoreObserver
         try {
@@ -100,18 +110,90 @@ class MediaObserverService : Service() {
         val baseExternal = Environment.getExternalStorageDirectory()
         val pathsToWatch = listOf(
             Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images")),
+            Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images/Private")),
+            Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Images")),
+            Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Images/Private")),
             Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Video")),
+            Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Video")),
+            Pair("com.whatsapp", File(baseExternal, "Pictures/WhatsApp")),
+            Pair("com.whatsapp.w4b", File(baseExternal, "Android/media/com.whatsapp.w4b/WhatsApp Business/Media/WhatsApp Business Images")),
             Pair("org.telegram.messenger", File(baseExternal, "Telegram/Telegram Images")),
-            Pair("org.telegram.messenger", File(baseExternal, "Pictures/Telegram"))
+            Pair("org.telegram.messenger", File(baseExternal, "Pictures/Telegram")),
+            Pair("com.facebook.orca", File(baseExternal, "Pictures/Messenger")),
+            Pair("com.instagram.android", File(baseExternal, "Pictures/Instagram"))
         )
 
         for ((pkg, dir) in pathsToWatch) {
-            if (dir.exists() && dir.isDirectory) {
-                val observer = MediaFileObserver(dir, pkg) { file, packageName ->
-                    handleNewMediaFile(file, packageName)
+            try {
+                if (dir.exists() && dir.isDirectory) {
+                    val observer = MediaFileObserver(dir, pkg) { file, packageName ->
+                        handleNewMediaFile(file, packageName)
+                    }
+                    observer.startWatching()
+                    fileObservers.add(observer)
                 }
-                observer.startWatching()
-                fileObservers.add(observer)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun scanRecentMediaStore() {
+        serviceScope.launch {
+            try {
+                val projection = mutableListOf(
+                    MediaStore.MediaColumns._ID,
+                    MediaStore.MediaColumns.DISPLAY_NAME,
+                    MediaStore.MediaColumns.MIME_TYPE,
+                    MediaStore.MediaColumns.DATA
+                ).apply {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        add(MediaStore.MediaColumns.RELATIVE_PATH)
+                    }
+                }.toTypedArray()
+
+                val sinceSecs = (System.currentTimeMillis() - 30 * 60 * 1000L) / 1000L
+                val selection = "${MediaStore.MediaColumns.DATE_ADDED} >= ?"
+                val selectionArgs = arrayOf(sinceSecs.toString())
+
+                contentResolver.query(
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    projection,
+                    selection,
+                    selectionArgs,
+                    "${MediaStore.MediaColumns.DATE_ADDED} DESC"
+                )?.use { cursor ->
+                    val idIdx = cursor.getColumnIndex(MediaStore.MediaColumns._ID)
+                    val nameIdx = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME)
+                    val mimeIdx = cursor.getColumnIndex(MediaStore.MediaColumns.MIME_TYPE)
+                    val dataIdx = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
+                    val relPathIdx = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        cursor.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH)
+                    } else -1
+
+                    var count = 0
+                    while (cursor.moveToNext() && count < 10) {
+                        count++
+                        val id = cursor.getLong(idIdx)
+                        val name = cursor.getString(nameIdx) ?: "recent_photo.jpg"
+                        val mime = cursor.getString(mimeIdx) ?: "image/jpeg"
+                        val data = if (dataIdx >= 0) cursor.getString(dataIdx) ?: "" else ""
+                        val relPath = if (relPathIdx >= 0) cursor.getString(relPathIdx) ?: "" else ""
+
+                        val itemUri = Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id.toString())
+                        val combined = "$data/$relPath/$name".lowercase()
+                        val detectedPackage = when {
+                            combined.contains("whatsapp") -> "com.whatsapp"
+                            combined.contains("telegram") -> "org.telegram.messenger"
+                            combined.contains("messenger") -> "com.facebook.orca"
+                            combined.contains("instagram") -> "com.instagram.android"
+                            else -> "unknown.mediastore"
+                        }
+                        handleMediaStoreChange(itemUri, name, mime, detectedPackage)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }
@@ -133,6 +215,18 @@ class MediaObserverService : Service() {
                     else -> "DOCUMENT"
                 }
 
+                val now = System.currentTimeMillis()
+                val msgDao = app.database.messageDao()
+                val targetMsg = msgDao.getLatestPendingMediaMessage(packageName, sinceTimestamp = now - 120000L)
+                    ?: msgDao.getLatestMessageForPackage(packageName, sinceTimestamp = now - 60000L)
+
+                val threadId = targetMsg?.threadId
+                val messageId = targetMsg?.id
+
+                if (targetMsg != null) {
+                    msgDao.updateMessageMedia(targetMsg.id, cachedFile.absolutePath, "image/${cachedFile.extension}")
+                }
+
                 app.mediaRepository.saveCachedMedia(
                     packageName = packageName,
                     originalPath = file.absolutePath,
@@ -140,13 +234,15 @@ class MediaObserverService : Service() {
                     fileName = cachedFile.name,
                     mimeType = "image/${cachedFile.extension}",
                     fileSizeBytes = cachedFile.length(),
-                    mediaType = mediaType
+                    mediaType = mediaType,
+                    threadId = threadId,
+                    messageId = messageId
                 )
             }
         }
     }
 
-    private fun handleMediaStoreChange(uri: Uri, name: String, mime: String) {
+    private fun handleMediaStoreChange(uri: Uri, name: String, mime: String, packageName: String) {
         serviceScope.launch {
             val app = application as? NotiVaultApp ?: return@launch
 
@@ -154,17 +250,32 @@ class MediaObserverService : Service() {
             val existing = app.mediaRepository.getMediaByOriginalPath(uri.toString())
             if (existing != null) return@launch
 
-            val cachedFile = cacheManager.cacheContentUri(uri, mime, prefix = "mediastore")
+            val cachedFile = cacheManager.cacheContentUri(uri, mime, prefix = packageName.replace(".", "_"))
             if (cachedFile != null) {
                 val mediaType = if (mime.startsWith("video")) "VIDEO" else "IMAGE"
+                val now = System.currentTimeMillis()
+
+                val msgDao = app.database.messageDao()
+                val targetMsg = msgDao.getLatestPendingMediaMessage(packageName, sinceTimestamp = now - 120000L)
+                    ?: msgDao.getLatestMessageForPackage(packageName, sinceTimestamp = now - 60000L)
+
+                val threadId = targetMsg?.threadId
+                val messageId = targetMsg?.id
+
+                if (targetMsg != null) {
+                    msgDao.updateMessageMedia(targetMsg.id, cachedFile.absolutePath, mime)
+                }
+
                 app.mediaRepository.saveCachedMedia(
-                    packageName = "unknown.mediastore",
+                    packageName = packageName,
                     originalPath = uri.toString(),
                     internalSavedPath = cachedFile.absolutePath,
                     fileName = cachedFile.name,
                     mimeType = mime,
                     fileSizeBytes = cachedFile.length(),
-                    mediaType = mediaType
+                    mediaType = mediaType,
+                    threadId = threadId,
+                    messageId = messageId
                 )
             }
         }

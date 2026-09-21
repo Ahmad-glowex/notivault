@@ -32,11 +32,15 @@ class DeletedMessageDetectorTest {
         assertTrue(DeletedMessageDetector.isDeletedNotification("Claire: Ce message a été supprimé."))
         // German
         assertTrue(DeletedMessageDetector.isDeletedNotification("Diese Nachricht wurde gelöscht"))
-        // Hindi & Bengali
+        // Hindi & Bengali (both YYA \u09DF and JA+NUKTA \u09AF\u09BC)
         assertTrue(DeletedMessageDetector.isDeletedNotification("এই বার্তাটি মুছে ফেলা হয়েছে"))
-        assertTrue(DeletedMessageDetector.isDeletedNotification("বার্তাটি মুছে ফেলা হয়েছে"))
-        assertTrue(DeletedMessageDetector.isDeletedNotification("মেসেজ মুছে ফেলা হয়েছে"))
-        assertTrue(DeletedMessageDetector.isDeletedNotification("Ahmad: এই বার্তাটি মুছে ফেলা হয়েছে"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("এই বার্তাটি মুছে ফেলা হয়েছে"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("বার্তাটি মুছে ফেলা হয়েছে"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("মেসেজটি মুছে ফেলা হয়েছে"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("Ahmad: এই বার্তাটি মুছে ফেলা হয়েছে"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("আপনি একটি বার্তা মুছে ফেলেছেন"))
+        assertEquals("Ahmad", DeletedMessageDetector.extractUnsentAuthor("Ahmad: এই বার্তাটি মুছে ফেলা হয়েছে", "Ahmad"))
+        assertEquals("আহমদ", DeletedMessageDetector.extractUnsentAuthor("আহমদ একটি বার্তা মুছে ফেলেছেন", "Fallback"))
         assertTrue(DeletedMessageDetector.isDeletedNotification("यह संदेश हटा दिया गया था"))
     }
 
@@ -48,8 +52,10 @@ class DeletedMessageDetectorTest {
         assertTrue(DeletedMessageDetector.isDeletedNotification("\uFEFFThis message was deleted"))
         assertTrue(DeletedMessageDetector.isDeletedNotification("\u00A0This message was deleted"))
         assertTrue(DeletedMessageDetector.isDeletedNotification("\u200Eএই বার্তাটি মুছে ফেলা হয়েছে"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("\u200Eএই বার্তাটি মুছে ফেলা হয়েছে"))
         assertTrue(DeletedMessageDetector.isDeletedNotification("Ahmad 👍: \u200EThis message was deleted"))
         assertTrue(DeletedMessageDetector.isDeletedNotification("আহমদ: \u200Eএই বার্তাটি মুছে ফেলা হয়েছে"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("আহমদ: \u200Eএই বার্তাটি মুছে ফেলা হয়েছে"))
     }
 
     @Test

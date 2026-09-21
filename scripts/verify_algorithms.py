@@ -5,13 +5,14 @@ Tests DeletedMessageDetector regexes, NotificationParser sender separation, and 
 """
 
 import re
+import unicodedata
 import unittest
 
 DELETED_PATTERNS = [
     # English
     re.compile(r"^(?:.+?:\s+)?(?:This message was deleted|You deleted this message|This message was deleted by (?:the author|an admin|admin|you)|(?:.+?\s+)?unsent a message|Message was unsent|Message was deleted|Message deleted|Message was removed|This media was deleted|This photo was deleted|This video was deleted|Deleted message|This message has been deleted)[.!]?$", re.IGNORECASE),
-    # Bengali
-    re.compile(r"^(?:.+?:\s+)?(?:(?:এই\s+)?(?:বার্তাটি|মেসেজটি|মেসেজ)\s+মুছে ফেলা হয়েছে|একটি বার্তা মুছে ফেলা হয়েছে|আপনি একটি বার্তা মুছে ফেলেছেন|বার্তা মুছে ফেলা হয়েছে)[.!]?$", re.IGNORECASE),
+    # Bengali (WhatsApp, Messenger, IMO) - handles both \u09DF and \u09AF\u09BC
+    re.compile(r"^(?:.+?:\s+)?(?:(?:এই\s+)?(?:বার্তাটি|মেসেজটি|মেসেজ|লেখাটি)\s+(?:মুছে ফেলা হয়েছে|মুছে ফেলা হয়েছে|মুছে দেওয়া হয়েছে|মুছে দেয়া হয়েছে|মুছে ফেলেছেন)|একটি বার্তা (?:মুছে ফেলা হয়েছে|মুছে ফেলা হয়েছে|মুছে ফেলেছেন)|আপনি একটি বার্তা (?:মুছে ফেলেছেন|মুছে দিয়েছেন|মুছে দিয়েছেন)|বার্তা মুছে ফেলা হয়েছে|বার্তা মুছে ফেলা হয়েছে)[.!]?$", re.IGNORECASE),
     # Hindi
     re.compile(r"^(?:.+?:\s+)?(?:(?:यह\s+)?संदेश हटा दिया गया(?: था)?|आपने एक संदेश हटा दिया)[.!]?$", re.IGNORECASE),
     # Spanish
@@ -30,21 +31,24 @@ DELETED_PATTERNS = [
 
 UNSENT_AUTHOR_PATTERNS = [
     re.compile(r"^(?:(.+?)\s+unsent a message)[.!]?$", re.IGNORECASE),
+    re.compile(r"^(?:(.+?)\s+একটি বার্তা মুছে ফেলেছেন)[.!]?$", re.IGNORECASE),
     re.compile(r"^(?:(.+?)\s+a annulé l'envoi d'un message)[.!]?$", re.IGNORECASE),
     re.compile(r"^(?:(.+?)\s+eliminó un mensaje)[.!]?$", re.IGNORECASE),
     re.compile(r"^(?:(.+?)\s+anulou o envio de uma mensagem)[.!]?$", re.IGNORECASE),
     re.compile(r"^(?:(.+?)\s+hat eine Nachricht zurückgerufen)[.!]?$", re.IGNORECASE),
-    re.compile(r"^([^:]+):\s+(?:This message was deleted|You deleted this message|Message deleted|Este mensaje|Esta mensagem|Ce message|Diese Nachricht)[.!]?$", re.IGNORECASE)
+    re.compile(r"^([^:]+):\s+(?:এই বার্তাটি|মেসেজটি|This message was deleted|You deleted this message|Message deleted|Este mensaje|Esta mensagem|Ce message|Diese Nachricht)[.!]?$", re.IGNORECASE)
 ]
 
-SELF_PRONOUNS = {"you", "vous", "tú", "tu", "você", "voce", "du"}
+SELF_PRONOUNS = {"you", "vous", "tú", "tu", "você", "voce", "du", "আপনি"}
 
 GROUP_TITLE_SENDER_PATTERN = re.compile(r"^(.+?)\s*\((.+?)\)$")
 
 def sanitize(text: str | None) -> str:
     if not text:
         return ""
-    return re.sub(r"[\u200B-\u200F\uFEFF\u202A-\u202E\u00A0]", "", text).strip()
+    without_invisibles = re.sub(r"[\u200B-\u200F\uFEFF\u202A-\u202E\u00A0]", "", text).strip()
+    normalized = unicodedata.normalize("NFC", without_invisibles)
+    return normalized.replace("\u09AF\u09BC", "\u09DF")
 
 def is_deleted_notification(text: str | None) -> bool:
     clean = sanitize(text)
@@ -171,11 +175,15 @@ class TestNotiVaultAlgorithms(unittest.TestCase):
         self.assertEqual(text, "Dinner is ready")
 
     def test_hindi_bengali_deleted(self):
-        self.assertTrue(is_deleted_notification("এই বার্তাটি মুছে ফেলা হয়েছে"))
-        self.assertTrue(is_deleted_notification("বার্তাটি মুছে ফেলা হয়েছে"))
-        self.assertTrue(is_deleted_notification("মেসেজ মুছে ফেলা হয়েছে"))
-        self.assertTrue(is_deleted_notification("Ahmad: এই বার্তাটি মুছে ফেলা হয়েছে"))
+        self.assertTrue(is_deleted_notification("এই বার্তাটি মুছে ফেলা হয়েছে")) # \u09af\u09bc
+        self.assertTrue(is_deleted_notification("এই বার্তাটি মুছে ফেলা হয়েছে")) # \u09df
+        self.assertTrue(is_deleted_notification("বার্তাটি মুছে ফেলা হয়েছে"))
+        self.assertTrue(is_deleted_notification("মেসেজটি মুছে ফেলা হয়েছে"))
+        self.assertTrue(is_deleted_notification("Ahmad: এই বার্তাটি মুছে ফেলা হয়েছে"))
         self.assertTrue(is_deleted_notification("Ahmad 👍: This message was deleted"))
+        self.assertTrue(is_deleted_notification("আপনি একটি বার্তা মুছে ফেলেছেন"))
+        self.assertEqual(extract_unsent_author("Ahmad: এই বার্তাটি মুছে ফেলা হয়েছে", "Ahmad"), "Ahmad")
+        self.assertEqual(extract_unsent_author("আহমদ একটি বার্তা মুছে ফেলেছেন", "Fallback"), "আহমদ")
         self.assertTrue(is_deleted_notification("यह संदेश हटा दिया गया था"))
 
     def test_unicode_invisible_marks(self):
@@ -183,7 +191,7 @@ class TestNotiVaultAlgorithms(unittest.TestCase):
         self.assertTrue(is_deleted_notification("\u200FThis message was deleted."))
         self.assertTrue(is_deleted_notification("\uFEFFThis message was deleted"))
         self.assertTrue(is_deleted_notification("\u00A0This message was deleted"))
-        self.assertTrue(is_deleted_notification("\u200Eএই বার্তাটি মুছে ফেলা হয়েছে"))
+        self.assertTrue(is_deleted_notification("\u200Eএই বার্তাটি মুছে ফেলা হয়েছে"))
         self.assertTrue(is_deleted_notification("Ahmad: \u200EThis message was deleted"))
 
     def test_csv_escaping(self):

@@ -12,6 +12,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.notivault.app.ui.screens.chat.ChatDetailScreen
 import com.notivault.app.ui.screens.chat.ChatDetailViewModel
+import com.notivault.app.ui.screens.deleted.DeletedMessagesScreen
 import com.notivault.app.ui.screens.home.HomeScreen
 import com.notivault.app.ui.screens.media.MediaGalleryScreen
 import com.notivault.app.ui.screens.settings.SettingsScreen
@@ -38,6 +39,9 @@ fun NotiVaultNavGraph(
                 },
                 onNavigateToSettings = {
                     navController.navigate(Screen.Settings.route)
+                },
+                onNavigateToDeleted = {
+                    navController.navigate(Screen.DeletedMessages.route)
                 }
             )
         }
@@ -70,6 +74,15 @@ fun NotiVaultNavGraph(
         composable(Screen.MediaGallery.route) {
             MediaGalleryScreen(
                 onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.DeletedMessages.route) {
+            DeletedMessagesScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToChat = { threadId ->
+                    navController.navigate(Screen.ChatDetail.createRoute(threadId))
+                }
             )
         }
 

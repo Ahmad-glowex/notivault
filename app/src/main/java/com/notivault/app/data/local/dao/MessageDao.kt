@@ -73,6 +73,23 @@ interface MessageDao {
         timestamp: Long
     ): MessageEntity?
 
+    @Query("""
+        SELECT * FROM messages 
+        WHERE threadId = :threadId 
+          AND senderName = :senderName 
+          AND messageText = :messageText 
+          AND ABS(timestamp - :timestamp) <= :toleranceMs
+        ORDER BY ABS(timestamp - :timestamp) ASC
+        LIMIT 1
+    """)
+    suspend fun findExistingMessageWithTolerance(
+        threadId: String,
+        senderName: String,
+        messageText: String,
+        timestamp: Long,
+        toleranceMs: Long = 5000L
+    ): MessageEntity?
+
     @Query("SELECT * FROM messages ORDER BY timestamp ASC")
     suspend fun getAllMessagesSync(): List<MessageEntity>
 
@@ -90,8 +107,54 @@ interface MessageDao {
     suspend fun getActiveMessageNearTimestamp(
         threadId: String,
         timestamp: Long,
-        toleranceMs: Long = 10000L
+        toleranceMs: Long = 30000L
     ): MessageEntity?
+
+    @Query("""
+        UPDATE messages 
+        SET mediaUri = :mediaUri, hasMedia = 1, mediaMimeType = COALESCE(:mimeType, mediaMimeType, 'image/jpeg') 
+        WHERE id = :id
+    """)
+    suspend fun updateMessageMedia(id: Long, mediaUri: String, mimeType: String?)
+
+    @Query("""
+        SELECT * FROM messages 
+        WHERE packageName = :packageName 
+          AND (hasMedia = 1 OR messageText LIKE '%photo%' OR messageText LIKE '%image%' OR messageText LIKE '%video%' OR messageText LIKE '%📷%') 
+          AND (mediaUri IS NULL OR mediaUri = '') 
+          AND timestamp >= :sinceTimestamp 
+        ORDER BY timestamp DESC 
+        LIMIT 1
+    """)
+    suspend fun getLatestPendingMediaMessage(packageName: String, sinceTimestamp: Long): MessageEntity?
+
+    @Query("""
+        SELECT * FROM messages 
+        WHERE packageName = :packageName 
+          AND timestamp >= :sinceTimestamp 
+        ORDER BY timestamp DESC 
+        LIMIT 1
+    """)
+    suspend fun getLatestMessageForPackage(packageName: String, sinceTimestamp: Long): MessageEntity?
+
+    @Query("""
+        SELECT * FROM messages 
+        WHERE packageName = :packageName 
+          AND isDeleted = 0 
+        ORDER BY timestamp DESC 
+        LIMIT 1
+    """)
+    suspend fun getLatestActiveMessageForPackage(packageName: String): MessageEntity?
+
+    @Query("""
+        SELECT * FROM messages 
+        WHERE packageName = :packageName 
+          AND senderName = :senderName 
+          AND isDeleted = 0 
+        ORDER BY timestamp DESC 
+        LIMIT 1
+    """)
+    suspend fun getLatestActiveMessageBySenderForPackage(packageName: String, senderName: String): MessageEntity?
 
     @Query("DELETE FROM messages WHERE id = :id")
     suspend fun deleteMessage(id: Long)

@@ -31,7 +31,8 @@ class MediaCacheManager(private val context: Context) {
     suspend fun cacheBitmap(bitmap: Bitmap, prefix: String = "photo"): File? = withContext(Dispatchers.IO) {
         try {
             val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
-            val targetName = "${prefix}_${timeStamp}.jpg"
+            val uniqueSuffix = java.util.UUID.randomUUID().toString().take(6)
+            val targetName = "${prefix}_${timeStamp}_${uniqueSuffix}.jpg"
             val targetFile = File(mediaStorageDir, targetName)
 
             FileOutputStream(targetFile).use { output ->
@@ -53,8 +54,8 @@ class MediaCacheManager(private val context: Context) {
             val bitmap = if (drawable is BitmapDrawable) {
                 drawable.bitmap
             } else {
-                val width = drawable.intrinsicWidth.coerceAtLeast(1)
-                val height = drawable.intrinsicHeight.coerceAtLeast(1)
+                val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 512
+                val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 512
                 val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                 val canvas = Canvas(bmp)
                 drawable.setBounds(0, 0, canvas.width, canvas.height)
@@ -76,9 +77,10 @@ class MediaCacheManager(private val context: Context) {
         if (!sourceFile.exists() || !sourceFile.canRead()) return@withContext null
 
         try {
-            val extension = sourceFile.extension.ifEmpty { "bin" }
+            val extension = sourceFile.extension.ifEmpty { "jpg" }
             val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
-            val targetName = "${prefix}_${timeStamp}.${extension}"
+            val uniqueSuffix = java.util.UUID.randomUUID().toString().take(6)
+            val targetName = "${prefix}_${timeStamp}_${uniqueSuffix}.${extension}"
             val targetFile = File(mediaStorageDir, targetName)
 
             sourceFile.inputStream().use { input ->
@@ -99,16 +101,19 @@ class MediaCacheManager(private val context: Context) {
     suspend fun cacheContentUri(uri: Uri, mimeType: String?, prefix: String = "media"): File? = withContext(Dispatchers.IO) {
         try {
             val ext = when {
-                mimeType?.contains("image/jpeg") == true -> "jpg"
                 mimeType?.contains("image/png") == true -> "png"
                 mimeType?.contains("image/webp") == true -> "webp"
-                mimeType?.contains("video/mp4") == true -> "mp4"
+                mimeType?.contains("image/gif") == true -> "gif"
+                mimeType?.startsWith("image") == true -> "jpg"
+                mimeType?.contains("video/3gp") == true -> "3gp"
+                mimeType?.startsWith("video") == true -> "mp4"
                 mimeType?.contains("audio/ogg") == true -> "ogg"
-                mimeType?.contains("audio/mp4") == true -> "m4a"
-                else -> "bin"
+                mimeType?.startsWith("audio") == true -> "m4a"
+                else -> "jpg"
             }
             val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
-            val targetName = "${prefix}_${timeStamp}.${ext}"
+            val uniqueSuffix = java.util.UUID.randomUUID().toString().take(6)
+            val targetName = "${prefix}_${timeStamp}_${uniqueSuffix}.${ext}"
             val targetFile = File(mediaStorageDir, targetName)
 
             context.contentResolver.openInputStream(uri)?.use { input ->

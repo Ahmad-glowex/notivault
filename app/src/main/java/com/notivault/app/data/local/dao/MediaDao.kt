@@ -33,6 +33,19 @@ interface MediaDao {
     @Query("DELETE FROM saved_media WHERE id = :id")
     suspend fun deleteMedia(id: Long)
 
+    @Query("""
+        SELECT * FROM saved_media 
+        WHERE packageName = :packageName 
+          AND (threadId IS NULL OR threadId = '') 
+          AND timestamp >= :sinceTimestamp 
+        ORDER BY timestamp DESC 
+        LIMIT 1
+    """)
+    suspend fun getRecentUnlinkedMediaForPackage(packageName: String, sinceTimestamp: Long): MediaEntity?
+
+    @Query("UPDATE saved_media SET threadId = :threadId, messageId = :messageId WHERE id = :id")
+    suspend fun updateMediaLinkage(id: Long, threadId: String, messageId: Long?)
+
     @Query("DELETE FROM saved_media")
     suspend fun deleteAllMedia()
 }

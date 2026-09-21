@@ -70,6 +70,7 @@ fun HomeScreen(
     onNavigateToChat: (String) -> Unit,
     onNavigateToMedia: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToDeleted: () -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -177,19 +178,13 @@ fun HomeScreen(
                     .padding(horizontal = 16.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Deleted messages badge (clickable filter)
+                // Deleted messages badge (clickable link to Preserved Deleted Messages)
                 Row(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (searchQuery == "(Deleted)") DeletedRed.copy(alpha = 0.25f) else DarkSurface)
-                        .clickable {
-                            if (searchQuery == "(Deleted)") {
-                                viewModel.onSearchQueryChanged("")
-                            } else {
-                                viewModel.onSearchQueryChanged("(Deleted)")
-                            }
-                        }
+                        .background(DarkSurface)
+                        .clickable { onNavigateToDeleted() }
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {

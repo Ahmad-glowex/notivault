@@ -68,15 +68,32 @@ class MessageRepositoryImpl(
             return@withContext 0L
         }
 
-        // Deduplication: Check if this exact message has already been captured
-        val existingMsg = messageDao.findExistingMessage(
+        // Deduplication: Check if this exact message or duplicate within 5s tolerance exists
+        val existingMsg = messageDao.findExistingMessageWithTolerance(
             threadId = threadId,
             senderName = resolvedSender,
             messageText = messageText,
-            timestamp = timestamp
+            timestamp = timestamp,
+            toleranceMs = 5000L
         )
         if (existingMsg != null) {
+            // If new notification has media but stored one did not, update media
+            if (!mediaUri.isNullOrEmpty() && existingMsg.mediaUri.isNullOrEmpty()) {
+                messageDao.updateMessageMedia(existingMsg.id, mediaUri, "image/jpeg")
+            }
             return@withContext existingMsg.id
+        }
+
+        // Attempt linking with recently cached unlinked media for this package (e.g. MediaStoreObserver captured just before notification)
+        var resolvedMediaUri = mediaUri
+        var resolvedHasMedia = hasMedia
+        if (resolvedMediaUri.isNullOrEmpty() && (hasMedia || com.notivault.app.service.parser.NotificationParser.run { messageText.contains("photo", ignoreCase = true) || messageText.contains("📷") })) {
+            val unlinkedMedia = db.mediaDao().getRecentUnlinkedMediaForPackage(packageName, sinceTimestamp = timestamp - 30000L)
+            if (unlinkedMedia != null) {
+                resolvedMediaUri = unlinkedMedia.internalSavedPath
+                resolvedHasMedia = true
+                db.mediaDao().updateMediaLinkage(unlinkedMedia.id, threadId, null)
+            }
         }
 
         // Update or insert thread
@@ -104,9 +121,9 @@ class MessageRepositoryImpl(
             isDeleted = false,
             deletedTimestamp = null,
             originalNotificationKey = notificationKey,
-            hasMedia = hasMedia,
-            mediaUri = mediaUri,
-            mediaMimeType = if (hasMedia) "image/jpeg" else null,
+            hasMedia = resolvedHasMedia,
+            mediaUri = resolvedMediaUri,
+            mediaMimeType = if (resolvedHasMedia) "image/jpeg" else null,
             isSelf = false
         )
         val msgId = messageDao.insertMessage(messageEntity)
@@ -123,23 +140,46 @@ class MessageRepositoryImpl(
         senderName: String,
         timestamp: Long
     ): Boolean = withContext(Dispatchers.IO) {
-        val cleanTitle = chatTitle.trim().ifEmpty { senderName.trim().ifEmpty { "Unknown" } }
-        val resolvedSender = senderName.trim().ifEmpty { cleanTitle }
-        val threadId = "${packageName}_$cleanTitle"
+        var cleanTitle = chatTitle.trim().ifEmpty { senderName.trim().ifEmpty { "Unknown" } }
+        var resolvedSender = senderName.trim().ifEmpty { cleanTitle }
 
-        // 1. Try matching active message near the deletion timestamp (within 10s)
-        var targetMessage = if (timestamp > 0) {
-            messageDao.getActiveMessageNearTimestamp(threadId, timestamp, toleranceMs = 10000L)
-        } else null
+        // If title is just the generic app name ("WhatsApp", "Telegram"), ignore it for threadId
+        val isGenericAppTitle = cleanTitle.equals("WhatsApp", ignoreCase = true) ||
+                cleanTitle.equals("Telegram", ignoreCase = true) ||
+                cleanTitle.equals("Messenger", ignoreCase = true) ||
+                cleanTitle.equals(packageName, ignoreCase = true)
 
-        // 2. Fallback to latest active message by this sender
-        if (targetMessage == null) {
-            targetMessage = messageDao.getLatestActiveMessageBySender(threadId, resolvedSender)
+        var threadId = "${packageName}_$cleanTitle"
+
+        // 1. Try matching active message in thread near the deletion timestamp (within 30s)
+        var targetMessage: MessageEntity? = null
+        if (!isGenericAppTitle) {
+            if (timestamp > 0) {
+                targetMessage = messageDao.getActiveMessageNearTimestamp(threadId, timestamp, toleranceMs = 30000L)
+            }
+            // 2. Fallback to latest active message by this sender in thread
+            if (targetMessage == null) {
+                targetMessage = messageDao.getLatestActiveMessageBySender(threadId, resolvedSender)
+            }
+            // 3. Fallback to latest active message in thread
+            if (targetMessage == null) {
+                targetMessage = messageDao.getLatestActiveMessageInThread(threadId)
+            }
         }
 
-        // 3. Fallback to latest active message in thread
+        // 4. Fallback across entire package if generic app title or thread had no matching messages
         if (targetMessage == null) {
-            targetMessage = messageDao.getLatestActiveMessageInThread(threadId)
+            if (resolvedSender.isNotBlank() && !isGenericAppTitle) {
+                targetMessage = messageDao.getLatestActiveMessageBySenderForPackage(packageName, resolvedSender)
+            }
+            if (targetMessage == null) {
+                targetMessage = messageDao.getLatestActiveMessageForPackage(packageName)
+            }
+            if (targetMessage != null) {
+                threadId = targetMessage.threadId
+                cleanTitle = targetMessage.threadId.removePrefix("${packageName}_")
+                resolvedSender = targetMessage.senderName
+            }
         }
 
         if (targetMessage != null) {
@@ -158,7 +198,11 @@ class MessageRepositoryImpl(
             return@withContext true
         } else {
             // Original message was not cached beforehand (e.g. sender unsent immediately).
-            // Preserve a tombstone record so user sees deletion occurred.
+            // Preserve a tombstone record only if we have a real contact name (not generic app title)
+            if (isGenericAppTitle) {
+                return@withContext false
+            }
+
             val existingThread = chatDao.getThreadSync(threadId)
             val updatedThread = ChatThreadEntity(
                 threadId = threadId,

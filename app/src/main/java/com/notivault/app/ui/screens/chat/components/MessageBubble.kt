@@ -124,26 +124,30 @@ fun MessageBubble(
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 
-                // View Once preserved badge
+                // View Once indicator
                 if (isViewOnce) {
+                    val isCached = mediaFile != null
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .background(TealSecondary.copy(alpha = 0.15f))
+                            .background(
+                                if (isCached) TealSecondary.copy(alpha = 0.15f)
+                                else Color(0xFFF59E0B).copy(alpha = 0.15f)
+                            )
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Visibility,
                             contentDescription = null,
-                            tint = TealSecondary,
+                            tint = if (isCached) TealSecondary else Color(0xFFF59E0B),
                             modifier = Modifier.size(12.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "View Once Preserved",
+                            text = if (isCached) "View Once Preserved" else "View Once (Notification Only)",
                             style = MaterialTheme.typography.labelSmall,
-                            color = TealSecondary,
+                            color = if (isCached) TealSecondary else Color(0xFFF59E0B),
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -198,14 +202,14 @@ fun MessageBubble(
                         Icon(
                             imageVector = Icons.Default.Attachment,
                             contentDescription = "Attachment",
-                            tint = TealSecondary,
+                            tint = TextSecondaryDark,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Attachment logged",
+                            text = "Media not saved to device storage",
                             style = MaterialTheme.typography.labelSmall,
-                            color = TealSecondary
+                            color = TextSecondaryDark
                         )
                     }
                 }

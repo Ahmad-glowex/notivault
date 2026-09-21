@@ -40,6 +40,38 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
+        val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS messages_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        threadId TEXT NOT NULL,
+                        packageName TEXT NOT NULL,
+                        senderName TEXT NOT NULL,
+                        messageText TEXT NOT NULL,
+                        timestamp INTEGER NOT NULL,
+                        isDeleted INTEGER NOT NULL,
+                        deletedTimestamp INTEGER,
+                        originalNotificationKey TEXT,
+                        hasMedia INTEGER NOT NULL,
+                        mediaUri TEXT,
+                        mediaMimeType TEXT,
+                        isSelf INTEGER NOT NULL
+                    )
+                """)
+                db.execSQL("""
+                    INSERT INTO messages_new (id, threadId, packageName, senderName, messageText, timestamp, isDeleted, deletedTimestamp, originalNotificationKey, hasMedia, mediaUri, mediaMimeType, isSelf)
+                    SELECT id, threadId, packageName, senderName, messageText, timestamp, isDeleted, deletedTimestamp, originalNotificationKey, hasMedia, mediaUri, mediaMimeType, isSelf FROM messages
+                """)
+                db.execSQL("DROP TABLE messages")
+                db.execSQL("ALTER TABLE messages_new RENAME TO messages")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_messages_threadId ON messages(threadId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_messages_packageName ON messages(packageName)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_messages_timestamp ON messages(timestamp)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_messages_isDeleted ON messages(isDeleted)")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -47,6 +79,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "notivault_database.db"
                 )
+                    .addMigrations(MIGRATION_1_2)
                     .fallbackToDestructiveMigration()
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
