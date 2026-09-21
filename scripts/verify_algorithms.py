@@ -149,6 +149,28 @@ def escape_csv(val: str) -> str:
     return f'"{escaped}"'
 
 
+def deduplicate_messages(messages: list[dict], tolerance_ms: int = 15000) -> list[dict]:
+    from collections import defaultdict
+    groups = defaultdict(list)
+    for msg in messages:
+        key = (msg["thread_id"], msg["sender_name"], msg["message_text"])
+        groups[key].append(msg)
+
+    kept_ids = set()
+    for key, group in groups.items():
+        sorted_group = sorted(group, key=lambda m: m["timestamp"])
+        base = sorted_group[0]
+        kept_ids.add(base["id"])
+        for candidate in sorted_group[1:]:
+            if abs(candidate["timestamp"] - base["timestamp"]) <= tolerance_ms:
+                # duplicate dropped
+                pass
+            else:
+                base = candidate
+                kept_ids.add(base["id"])
+    return [m for m in messages if m["id"] in kept_ids]
+
+
 class TestNotiVaultAlgorithms(unittest.TestCase):
 
     def test_whatsapp_detection(self):
@@ -297,6 +319,19 @@ class TestNotiVaultAlgorithms(unittest.TestCase):
         self.assertEqual(escape_csv('He said "hello".'), '"He said ""hello""."')
         self.assertEqual(escape_csv("Line 1\nLine 2\rLine 3"), '"Line 1 Line 2 Line 3"')
         self.assertEqual(escape_csv("Line 1\r\nLine 2"), '"Line 1 Line 2"')
+
+    def test_message_deduplication_15s_tolerance(self):
+        msgs = [
+            {"id": 1, "thread_id": "com.whatsapp_Alice", "sender_name": "Alice", "message_text": "Hi", "timestamp": 1000},
+            {"id": 2, "thread_id": "com.whatsapp_Alice", "sender_name": "Alice", "message_text": "Hi", "timestamp": 3000}, # duplicate (2s apart)
+            {"id": 3, "thread_id": "com.whatsapp_Alice", "sender_name": "Alice", "message_text": "Hi", "timestamp": 14000}, # duplicate (13s from base)
+            {"id": 4, "thread_id": "com.whatsapp_Alice", "sender_name": "Alice", "message_text": "Hi", "timestamp": 30000}, # NOT duplicate (29s from base)
+            {"id": 5, "thread_id": "com.whatsapp_Alice", "sender_name": "Alice", "message_text": "Sent a photo", "timestamp": 35000},
+            {"id": 6, "thread_id": "com.whatsapp_Alice", "sender_name": "Alice", "message_text": "Sent a photo", "timestamp": 36000}, # duplicate (1s apart)
+        ]
+        result = deduplicate_messages(msgs, tolerance_ms=15000)
+        result_ids = [m["id"] for m in result]
+        self.assertEqual(result_ids, [1, 4, 5])
 
 
 if __name__ == '__main__':

@@ -16,7 +16,6 @@ import com.notivault.app.ui.screens.deleted.DeletedMessagesScreen
 import com.notivault.app.ui.screens.home.HomeScreen
 import com.notivault.app.ui.screens.media.MediaGalleryScreen
 import com.notivault.app.ui.screens.settings.SettingsScreen
-import com.notivault.app.ui.screens.viewonce.ViewOnceVaultScreen
 
 @Composable
 fun NotiVaultNavGraph(
@@ -43,9 +42,6 @@ fun NotiVaultNavGraph(
                 },
                 onNavigateToDeleted = {
                     navController.navigate(Screen.DeletedMessages.route)
-                },
-                onNavigateToViewOnce = {
-                    navController.navigate(Screen.ViewOnceVault.route)
                 }
             )
         }
@@ -87,12 +83,6 @@ fun NotiVaultNavGraph(
                 onNavigateToChat = { threadId ->
                     navController.navigate(Screen.ChatDetail.createRoute(threadId))
                 }
-            )
-        }
-
-        composable(Screen.ViewOnceVault.route) {
-            ViewOnceVaultScreen(
-                onNavigateBack = { navController.popBackStack() }
             )
         }
 

@@ -42,4 +42,5 @@ interface MessageRepository {
     suspend fun clearAllDeletedMessages()
     suspend fun clearAllData()
     suspend fun setAppMonitoring(packageName: String, isEnabled: Boolean)
+    suspend fun deduplicateExistingMessages(threadId: String? = null)
 }

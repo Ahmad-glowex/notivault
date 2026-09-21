@@ -38,20 +38,9 @@ object NotificationParser {
         val fallbackText = (extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
             ?: extras.getCharSequence(Notification.EXTRA_TEXT))?.toString()?.trim() ?: ""
 
-        // Skip pure group summary count notifications (e.g. "3 new messages" container)
-        val isGroupSummary = (notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0
-        val cleanFallbackForSummary = DeletedMessageDetector.sanitize(fallbackText)
-        val isSummaryCountText = (rawTitle.equals("WhatsApp", ignoreCase = true) || rawTitle.isEmpty()) &&
-                (cleanFallbackForSummary.matches(Regex("""^\d+\s+(?:new\s+)?messages?.*$""", RegexOption.IGNORE_CASE)) ||
-                 cleanFallbackForSummary.matches(Regex("""^\d+\s+টি\s+নতুন\s+মেসেজ.*$""")) ||
-                 cleanFallbackForSummary.matches(Regex("""^\d+\s+رسائل\s+جديدة.*$""")) ||
-                 cleanFallbackForSummary.matches(Regex("""^\d+\s+نئے\s+پیغامات.*$""")) ||
-                 cleanFallbackForSummary.matches(Regex("""^\d+\s+नए\s+संदेश.*$""")) ||
-                 cleanFallbackForSummary.matches(Regex("""^\d+\s+mensajes?\s+nuevos?.*$""", RegexOption.IGNORE_CASE)) ||
-                 cleanFallbackForSummary.matches(Regex("""^\d+\s+novas?\s+mensagens?.*$""", RegexOption.IGNORE_CASE)) ||
-                 cleanFallbackForSummary.matches(Regex("""^\d+\s+новых?\s+сообщен.*$""", RegexOption.IGNORE_CASE)) ||
-                 cleanFallbackForSummary.matches(Regex("""^\d+\s+条新消息.*$""")))
-        if (isGroupSummary && isSummaryCountText) {
+        // Unconditionally drop all group summary notifications. Summary notifications must never
+        // be parsed as messages since individual child notifications are already emitted.
+        if ((notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0) {
             return emptyList()
         }
 

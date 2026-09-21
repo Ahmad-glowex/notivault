@@ -87,11 +87,14 @@ interface MessageDao {
         senderName: String,
         messageText: String,
         timestamp: Long,
-        toleranceMs: Long = 5000L
+        toleranceMs: Long = 15000L
     ): MessageEntity?
 
     @Query("SELECT * FROM messages ORDER BY timestamp ASC")
     suspend fun getAllMessagesSync(): List<MessageEntity>
+
+    @Query("SELECT * FROM messages WHERE threadId = :threadId ORDER BY timestamp ASC")
+    suspend fun getMessagesForThreadSync(threadId: String): List<MessageEntity>
 
     @Query("DELETE FROM messages WHERE threadId = :threadId")
     suspend fun deleteMessagesForThread(threadId: String)

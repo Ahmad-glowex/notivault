@@ -50,6 +50,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         flow
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    init {
+        viewModelScope.launch {
+            messageRepo.deduplicateExistingMessages()
+        }
+    }
+
     fun selectTab(tab: AppTab) {
         _selectedTab.value = tab
     }

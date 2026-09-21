@@ -68,6 +68,8 @@ class MediaObserverService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        setupObservers()
+        scanRecentMediaStore()
         return START_STICKY
     }
 
@@ -87,40 +89,72 @@ class MediaObserverService : Service() {
 
     private fun setupObservers() {
         // 1. Setup MediaStore ContentObserver
-        val mediaStoreObserver = MediaStoreObserver(this) { uri, name, mime, packageName, data, relPath ->
-            handleMediaStoreChange(uri, name, mime, packageName, data, relPath)
-        }
-        this.mediaStoreObserver = mediaStoreObserver
-        try {
-            contentResolver.registerContentObserver(
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                true,
-                mediaStoreObserver
-            )
-            contentResolver.registerContentObserver(
-                MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                true,
-                mediaStoreObserver
-            )
-        } catch (e: Exception) {
-            e.printStackTrace()
+        if (mediaStoreObserver == null) {
+            val observer = MediaStoreObserver(this) { uri, name, mime, packageName, data, relPath ->
+                handleMediaStoreChange(uri, name, mime, packageName, data, relPath)
+            }
+            this.mediaStoreObserver = observer
+            try {
+                contentResolver.registerContentObserver(
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    true,
+                    observer
+                )
+                contentResolver.registerContentObserver(
+                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                    true,
+                    observer
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
 
         // 2. Setup FileObservers for WhatsApp and standard messaging folders
+        fileObservers.forEach { it.stopWatching() }
+        fileObservers.clear()
+
         val baseExternal = Environment.getExternalStorageDirectory()
         val pathsToWatch = listOf(
+            // WhatsApp Images
             Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images")),
             Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images/Private")),
             Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Images")),
             Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Images/Private")),
-            Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Video")),
-            Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Video")),
             Pair("com.whatsapp", File(baseExternal, "Pictures/WhatsApp")),
+            // WhatsApp Video
+            Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Video")),
+            Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Video/Private")),
+            Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Video")),
+            Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Video/Private")),
+            Pair("com.whatsapp", File(baseExternal, "Movies/WhatsApp")),
+            // WhatsApp Audio & Voice Notes
+            Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Audio")),
+            Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Audio/Private")),
+            Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Audio")),
+            Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Audio/Private")),
+            Pair("com.whatsapp", File(baseExternal, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Voice Notes")),
+            Pair("com.whatsapp", File(baseExternal, "WhatsApp/Media/WhatsApp Voice Notes")),
+            // WhatsApp Business
             Pair("com.whatsapp.w4b", File(baseExternal, "Android/media/com.whatsapp.w4b/WhatsApp Business/Media/WhatsApp Business Images")),
+            Pair("com.whatsapp.w4b", File(baseExternal, "Android/media/com.whatsapp.w4b/WhatsApp Business/Media/WhatsApp Business Video")),
+            Pair("com.whatsapp.w4b", File(baseExternal, "Android/media/com.whatsapp.w4b/WhatsApp Business/Media/WhatsApp Business Audio")),
+            // Telegram
             Pair("org.telegram.messenger", File(baseExternal, "Telegram/Telegram Images")),
+            Pair("org.telegram.messenger", File(baseExternal, "Telegram/Telegram Video")),
+            Pair("org.telegram.messenger", File(baseExternal, "Telegram/Telegram Audio")),
+            Pair("org.telegram.messenger", File(baseExternal, "Telegram/Telegram Documents")),
             Pair("org.telegram.messenger", File(baseExternal, "Pictures/Telegram")),
+            Pair("org.telegram.messenger", File(baseExternal, "Movies/Telegram")),
+            Pair("org.telegram.messenger", File(baseExternal, "Android/media/org.telegram.messenger/Telegram/Telegram Images")),
+            Pair("org.telegram.messenger", File(baseExternal, "Android/media/org.telegram.messenger/Telegram/Telegram Video")),
+            // Messenger
             Pair("com.facebook.orca", File(baseExternal, "Pictures/Messenger")),
-            Pair("com.instagram.android", File(baseExternal, "Pictures/Instagram"))
+            Pair("com.facebook.orca", File(baseExternal, "Movies/Messenger")),
+            Pair("com.facebook.orca", File(baseExternal, "Android/media/com.facebook.orca")),
+            // Instagram
+            Pair("com.instagram.android", File(baseExternal, "Pictures/Instagram")),
+            Pair("com.instagram.android", File(baseExternal, "Android/media/com.instagram.android"))
         )
 
         for ((pkg, dir) in pathsToWatch) {
@@ -134,6 +168,31 @@ class MediaObserverService : Service() {
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
+            }
+        }
+
+        scanExistingMediaDirectories(pathsToWatch)
+    }
+
+    private fun scanExistingMediaDirectories(paths: List<Pair<String, File>>) {
+        serviceScope.launch {
+            for ((pkg, dir) in paths) {
+                try {
+                    if (dir.exists() && dir.isDirectory) {
+                        val files = dir.listFiles { f ->
+                            f.isFile && !f.name.startsWith(".") && f.length() > 0 &&
+                                    !MediaStoreObserver.isBlacklisted(f.absolutePath, "", f.name)
+                        } ?: continue
+
+                        files.sortedByDescending { it.lastModified() }
+                            .take(25)
+                            .forEach { file ->
+                                handleNewMediaFile(file, pkg)
+                            }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
         }
     }
@@ -209,6 +268,13 @@ class MediaObserverService : Service() {
                     else -> "DOCUMENT"
                 }
 
+                val mimeType = when (mediaType) {
+                    "IMAGE" -> "image/${if (cachedFile.extension.equals("jpg", ignoreCase = true)) "jpeg" else cachedFile.extension.lowercase()}"
+                    "VIDEO" -> "video/${cachedFile.extension.lowercase()}"
+                    "AUDIO" -> "audio/${cachedFile.extension.lowercase()}"
+                    else -> "application/octet-stream"
+                }
+
                 val now = System.currentTimeMillis()
                 val msgDao = app.database.messageDao()
                 val targetMsg = msgDao.getLatestPendingMediaMessage(packageName, sinceTimestamp = now - 120000L)
@@ -218,7 +284,7 @@ class MediaObserverService : Service() {
                 val messageId = targetMsg?.id
 
                 if (targetMsg != null) {
-                    msgDao.updateMessageMedia(targetMsg.id, cachedFile.absolutePath, "image/${cachedFile.extension}")
+                    msgDao.updateMessageMedia(targetMsg.id, cachedFile.absolutePath, mimeType)
                 }
 
                 app.mediaRepository.saveCachedMedia(
@@ -226,7 +292,7 @@ class MediaObserverService : Service() {
                     originalPath = file.absolutePath,
                     internalSavedPath = cachedFile.absolutePath,
                     fileName = cachedFile.name,
-                    mimeType = "image/${cachedFile.extension}",
+                    mimeType = mimeType,
                     fileSizeBytes = cachedFile.length(),
                     mediaType = mediaType,
                     threadId = threadId,

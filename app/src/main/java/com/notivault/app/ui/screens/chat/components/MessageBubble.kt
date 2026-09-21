@@ -94,9 +94,12 @@ fun MessageBubble(
             .padding(vertical = 3.dp),
         horizontalAlignment = alignment
     ) {
+        val bubbleWidthMin = if (mediaFile != null) 240.dp else 120.dp
+        val bubbleWidthMax = if (mediaFile != null) 340.dp else 320.dp
+
         Box(
             modifier = Modifier
-                .widthIn(min = 120.dp, max = 320.dp)
+                .widthIn(min = bubbleWidthMin, max = bubbleWidthMax)
                 .clip(bubbleShape)
                 .border(1.dp, borderColor, bubbleShape)
                 .background(bubbleColor)
@@ -150,13 +153,13 @@ fun MessageBubble(
                     Spacer(modifier = Modifier.height(6.dp))
                 }
 
-                // Render cached media image if present
+                // Render cached media image cleanly and prominently
                 if (mediaFile != null) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 240.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .heightIn(min = 180.dp, max = 280.dp)
+                            .clip(RoundedCornerShape(12.dp))
                             .background(Color.Black.copy(alpha = 0.4f))
                             .clickable { onMediaClick?.invoke(mediaFile.absolutePath) }
                     ) {
@@ -165,20 +168,20 @@ fun MessageBubble(
                             contentDescription = "Attached Media",
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 240.dp),
+                                .heightIn(min = 180.dp, max = 280.dp),
                             contentScale = ContentScale.Crop
                         )
 
                         if (isVideo) {
                             Box(
-                                modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Videocam,
                                     contentDescription = "Play Video",
                                     tint = Color.White.copy(alpha = 0.9f),
-                                    modifier = Modifier.size(40.dp)
+                                    modifier = Modifier.size(48.dp)
                                 )
                             }
                         }
@@ -189,13 +192,15 @@ fun MessageBubble(
                 // Message Text Content
                 val cleanMsgText = message.messageText.trim()
                 val isPlaceholderText = cleanMsgText.isBlank() ||
-                        cleanMsgText.equals("📷 Sent a photo", ignoreCase = true) ||
-                        cleanMsgText.equals("Sent a photo", ignoreCase = true) ||
+                        cleanMsgText.contains("Sent a photo", ignoreCase = true) ||
+                        cleanMsgText.contains("sent a photo", ignoreCase = true) ||
                         cleanMsgText.equals("Photo", ignoreCase = true) ||
+                        cleanMsgText.equals("📷 Photo", ignoreCase = true) ||
                         cleanMsgText.equals("ছবি", ignoreCase = true) ||
                         cleanMsgText.equals("📷", ignoreCase = true) ||
                         cleanMsgText.equals("Video", ignoreCase = true) ||
                         cleanMsgText.equals("🎥 Video", ignoreCase = true) ||
+                        cleanMsgText.contains("Sent a video", ignoreCase = true) ||
                         cleanMsgText.equals("ভিডিও", ignoreCase = true)
 
                 // Only render text if: not a media placeholder when media is attached, OR media is absent

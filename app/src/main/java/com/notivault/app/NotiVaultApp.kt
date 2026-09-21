@@ -38,8 +38,13 @@ class NotiVaultApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // Clean up legacy polluted media (screenshots, camera photos, QR code view-once blobs, and contact avatars)
+        // Deduplicate existing messages and clean up legacy polluted media on startup
         CoroutineScope(Dispatchers.IO).launch {
+            try {
+                messageRepository.deduplicateExistingMessages()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
             cleanPollutedMediaRecords()
         }
 

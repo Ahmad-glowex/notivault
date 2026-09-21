@@ -33,6 +33,12 @@ class ChatDetailViewModel(
     private val _exportIntent = MutableStateFlow<Intent?>(null)
     val exportIntent: StateFlow<Intent?> = _exportIntent.asStateFlow()
 
+    init {
+        viewModelScope.launch {
+            messageRepo.deduplicateExistingMessages(threadId)
+        }
+    }
+
     fun exportToJson(context: Context) {
         viewModelScope.launch {
             val threadTitle = thread.value?.chatTitle ?: "Chat"
