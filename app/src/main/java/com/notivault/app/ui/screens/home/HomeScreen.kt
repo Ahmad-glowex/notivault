@@ -152,13 +152,6 @@ fun HomeScreen(
                             tint = TealSecondary
                         )
                     }
-                    IconButton(onClick = onNavigateToMedia) {
-                        Icon(
-                            imageVector = Icons.Default.Image,
-                            contentDescription = "Media Gallery",
-                            tint = TextPrimaryDark
-                        )
-                    }
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(
                             imageVector = Icons.Default.Settings,
@@ -192,21 +185,25 @@ fun HomeScreen(
                 )
                 NavigationBarItem(
                     selected = false,
-                    onClick = onNavigateToViewOnce,
-                    icon = { Icon(Icons.Default.Devices, contentDescription = "View-Once Vault") },
-                    label = { Text("View-Once") },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color.Black,
-                        selectedTextColor = TealSecondary,
-                        indicatorColor = TealSecondary,
-                        unselectedIconColor = TextSecondaryDark,
-                        unselectedTextColor = TextSecondaryDark
-                    )
-                )
-                NavigationBarItem(
-                    selected = false,
                     onClick = onNavigateToDeleted,
-                    icon = { Icon(Icons.Default.AutoDelete, contentDescription = "Deleted") },
+                    icon = {
+                        if (deletedCount > 0) {
+                            androidx.compose.material3.BadgedBox(
+                                badge = {
+                                    androidx.compose.material3.Badge(
+                                        containerColor = DeletedRed,
+                                        contentColor = Color.White
+                                    ) {
+                                        Text(text = if (deletedCount > 99) "99+" else deletedCount.toString())
+                                    }
+                                }
+                            ) {
+                                Icon(Icons.Default.AutoDelete, contentDescription = "Deleted")
+                            }
+                        } else {
+                            Icon(Icons.Default.AutoDelete, contentDescription = "Deleted")
+                        }
+                    },
                     label = { Text("Deleted") },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Color.Black,
@@ -219,7 +216,7 @@ fun HomeScreen(
                 NavigationBarItem(
                     selected = false,
                     onClick = onNavigateToMedia,
-                    icon = { Icon(Icons.Default.Image, contentDescription = "Media") },
+                    icon = { Icon(Icons.Default.Image, contentDescription = "Media Vault") },
                     label = { Text("Media") },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Color.Black,
@@ -387,13 +384,7 @@ fun HomeScreen(
             // App Filter Tabs
             AppFilterTabs(
                 selectedTab = selectedTab,
-                onTabSelected = { tab ->
-                    when (tab) {
-                        AppTab.SAVED_MEDIA -> onNavigateToMedia()
-                        AppTab.VIEW_ONCE -> onNavigateToViewOnce()
-                        else -> viewModel.selectTab(tab)
-                    }
-                }
+                onTabSelected = { tab -> viewModel.selectTab(tab) }
             )
 
             // Chat Threads List

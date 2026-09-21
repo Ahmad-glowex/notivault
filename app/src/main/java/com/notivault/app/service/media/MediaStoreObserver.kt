@@ -57,7 +57,7 @@ class MediaStoreObserver(
                         id?.let { Uri.withAppendedPath(uri, it.toString()) } ?: uri
                     }
 
-                    val detectedPackage = resolvePackage(data, relPath, name)
+                    val detectedPackage = resolveMessagingPackage(data, relPath, name) ?: continue
                     onMediaDetected(itemUri, name, mime, detectedPackage)
 
                     if (isItemUri) break
@@ -68,15 +68,56 @@ class MediaStoreObserver(
         }
     }
 
-    private fun resolvePackage(data: String, relPath: String, name: String): String {
-        val combined = "$data/$relPath/$name".lowercase()
-        return when {
-            combined.contains("com.whatsapp.w4b") -> "com.whatsapp.w4b"
-            combined.contains("whatsapp") || combined.contains("img-") || combined.contains("vid-") && combined.contains("wa") -> "com.whatsapp"
-            combined.contains("telegram") -> "org.telegram.messenger"
-            combined.contains("messenger") || combined.contains("facebook") -> "com.facebook.orca"
-            combined.contains("instagram") -> "com.instagram.android"
-            else -> "unknown.mediastore"
+    companion object {
+        private val BLACKLIST_PATTERNS = listOf(
+            "screenshots",
+            "screenshot",
+            "dcim",
+            "camera",
+            ".thumbnails",
+            "download",
+            "downloads"
+        )
+
+        fun isBlacklisted(data: String, relPath: String, name: String): Boolean {
+            val combined = "$data/$relPath/$name".lowercase()
+            return BLACKLIST_PATTERNS.any { combined.contains(it) }
+        }
+
+        fun resolveMessagingPackage(data: String, relPath: String, name: String): String? {
+            val combined = "$data/$relPath/$name".lowercase()
+
+            // 1. Explicitly ignore and skip screenshots, camera, dcim, thumbnails, downloads
+            if (isBlacklisted(data, relPath, name)) {
+                return null
+            }
+
+            // 2. Strict directory whitelist:
+            // - Android/media/com.whatsapp/ or WhatsApp/Media/ or Pictures/WhatsApp
+            // - Android/media/com.whatsapp.w4b/ or WhatsApp Business/Media/
+            // - Telegram/ or Android/media/org.telegram.messenger/ or Pictures/Telegram
+            // - Pictures/Messenger/ or Android/media/com.facebook.orca/
+            // - Pictures/Instagram/ or Android/media/com.instagram.android/
+            return when {
+                combined.contains("android/media/com.whatsapp.w4b") ||
+                combined.contains("whatsapp business/media") -> "com.whatsapp.w4b"
+
+                combined.contains("android/media/com.whatsapp") ||
+                combined.contains("whatsapp/media") ||
+                combined.contains("pictures/whatsapp") -> "com.whatsapp"
+
+                combined.contains("android/media/org.telegram.messenger") ||
+                combined.contains("telegram/telegram") ||
+                combined.contains("pictures/telegram") -> "org.telegram.messenger"
+
+                combined.contains("android/media/com.facebook.orca") ||
+                combined.contains("pictures/messenger") -> "com.facebook.orca"
+
+                combined.contains("android/media/com.instagram.android") ||
+                combined.contains("pictures/instagram") -> "com.instagram.android"
+
+                else -> null
+            }
         }
     }
 }

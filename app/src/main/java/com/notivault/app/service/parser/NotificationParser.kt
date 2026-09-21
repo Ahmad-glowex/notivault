@@ -70,8 +70,7 @@ object NotificationParser {
                 val mediaType = msg.dataMimeType
 
                 val isLatest = (i == messages.size - 1)
-                val isMediaText = isMediaIndicatingText(msgText) || (isLatest && isMediaIndicatingText(fallbackText))
-                val hasAttachedMedia = mediaUri != null || (isLatest && (extraBitmap != null || extraIcon != null || isMediaText))
+                val hasAttachedMedia = mediaUri != null || (isLatest && (extraBitmap != null || extraIcon != null))
 
                 if (msgText.isBlank() && hasAttachedMedia) {
                     msgText = if (fallbackText.isNotBlank() && isMediaIndicatingText(fallbackText)) {
@@ -136,8 +135,7 @@ object NotificationParser {
                         val mediaType = item.getString("dataMimeType")
 
                         val isLatest = (i == messagesArray.size - 1)
-                        val isMediaText = isMediaIndicatingText(msgText) || (isLatest && isMediaIndicatingText(fallbackText))
-                        val hasAttachedMedia = mediaUri != null || (isLatest && (extraBitmap != null || extraIcon != null || isMediaText))
+                        val hasAttachedMedia = mediaUri != null || (isLatest && (extraBitmap != null || extraIcon != null))
 
                         if (msgText.isBlank() && hasAttachedMedia) {
                             msgText = if (fallbackText.isNotBlank() && isMediaIndicatingText(fallbackText)) {
@@ -220,8 +218,7 @@ object NotificationParser {
                         lineSender
                     }
 
-                    val isMediaText = isMediaIndicatingText(lineText)
-                    val hasAttachedMedia = isLatest && (extraBitmap != null || extraIcon != null || isMediaText)
+                    val hasAttachedMedia = isLatest && (extraBitmap != null || extraIcon != null)
                     val msgBitmap = if (isLatest) extraBitmap else null
                     val msgIcon = if (isLatest && msgBitmap == null) extraIcon else null
 
@@ -264,8 +261,7 @@ object NotificationParser {
                     senderName
                 }
 
-                val isMediaText = isMediaIndicatingText(cleanText)
-                val hasAttachedMedia = extraBitmap != null || extraIcon != null || isMediaText
+                val hasAttachedMedia = extraBitmap != null || extraIcon != null
 
                 results.add(
                     ParsedNotification(
@@ -357,19 +353,15 @@ object NotificationParser {
             } catch (_: Exception) {}
         }
 
-        // 1. EXTRA_PICTURE ("android.picture")
+        // 1. EXTRA_PICTURE ("android.picture") from BigPictureStyle
         inspect(Notification.EXTRA_PICTURE)
         inspect("android.picture")
 
-        // 2. EXTRA_PICTURE_ICON ("android.pictureIcon")
+        // 2. EXTRA_PICTURE_ICON ("android.pictureIcon") from BigPictureStyle
         inspect("android.pictureIcon")
 
-        // 3. EXTRA_LARGE_ICON_BIG
-        inspect(Notification.EXTRA_LARGE_ICON_BIG)
-
-        // 4. EXTRA_LARGE_ICON
-        inspect(Notification.EXTRA_LARGE_ICON)
-
+        // Note: NEVER inspect EXTRA_LARGE_ICON or EXTRA_LARGE_ICON_BIG as they contain
+        // the sender's circular profile avatar, not an attached media file.
         return Pair(bitmap, icon)
     }
 

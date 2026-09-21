@@ -19,7 +19,9 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,11 +43,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Devices
-import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.LockClock
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.PowerSettingsNew
@@ -134,7 +138,36 @@ private val INJECTED_HOOK_JS = """
             return url;
         };
 
-        // 2. Periodic DOM scanner for QR code, connection state, and View Once elements
+        // Single Phone Helper: Trigger 'Link with phone number'
+        window.__notiVaultLinkWithPhone = function() {
+            try {
+                const elements = Array.from(document.querySelectorAll('*'));
+                for (const el of elements) {
+                    if (el.children.length === 0) {
+                        const t = (el.textContent || '').trim().toLowerCase();
+                        if (t === 'link with phone number' || t.includes('link with phone number') ||
+                            t.includes('ফোন নম্বর') || t.includes('ফোন নম্বর দিয়ে') ||
+                            t.includes('vincular con') || t.includes('número de teléfono') ||
+                            t.includes('ফোন নম্বর দিয়ে লিঙ্ক') ||
+                            t.includes('ربط باستخدام رقم الهاتف') || t.includes('फोन नंबर')) {
+                            el.click();
+                            return true;
+                        }
+                    }
+                }
+                const btns = Array.from(document.querySelectorAll('span[role="button"], div[role="button"], button'));
+                for (const b of btns) {
+                    const t = (b.textContent || '').toLowerCase();
+                    if (t.includes('phone') || t.includes('ফোন') || t.includes('número')) {
+                        b.click();
+                        return true;
+                    }
+                }
+            } catch(e) {}
+            return false;
+        };
+
+        // 2. Periodic DOM scanner for QR code, connection state, pairing code, and View Once elements
         function pollState() {
             try {
                 const qrCanvas = document.querySelector('canvas[aria-label*="QR"], canvas[role="img"], div[data-ref]');
@@ -146,6 +179,33 @@ private val INJECTED_HOOK_JS = """
                     if (window.NotiVaultBridge) window.NotiVaultBridge.onStatusUpdate('AUTHENTICATED');
                 } else if (qrCanvas) {
                     if (window.NotiVaultBridge) window.NotiVaultBridge.onStatusUpdate('QR_READY');
+                }
+
+                // Scan for WhatsApp 8-character pairing code
+                const codeContainers = document.querySelectorAll('[data-link-code], [data-testid="link-code-input"], [data-testid="link-device-phone-number-code-screen"]');
+                let foundCode = null;
+                for (const c of codeContainers) {
+                    const attr = c.getAttribute('data-link-code');
+                    if (attr && attr.length >= 8) {
+                        foundCode = attr;
+                        break;
+                    }
+                }
+                if (!foundCode) {
+                    const spans = document.querySelectorAll('span, div');
+                    for (const s of spans) {
+                        if (s.children.length === 0) {
+                            const text = (s.textContent || '').trim();
+                            const match = text.match(/\b([A-Z0-9]{4}[-\s][A-Z0-9]{4})\b/);
+                            if (match) {
+                                foundCode = match[1];
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (foundCode && window.NotiVaultBridge) {
+                    window.NotiVaultBridge.onPairingCode(foundCode);
                 }
 
                 // Intercept visible view once media images and videos
@@ -187,6 +247,7 @@ fun ViewOnceVaultScreen(
     val isGuideExpanded by viewModel.isGuideExpanded.collectAsState()
     val selectedMedia by viewModel.selectedMedia.collectAsState()
     val lastCapturedTime by viewModel.lastCapturedTime.collectAsState()
+    val pairingCode by viewModel.pairingCode.collectAsState()
 
     var selectedTab by remember { mutableIntStateOf(0) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
@@ -244,8 +305,8 @@ fun ViewOnceVaultScreen(
                 actions = {
                     IconButton(onClick = { viewModel.toggleGuide() }) {
                         Icon(
-                            imageVector = Icons.Default.HelpOutline,
-                            contentDescription = "QR Guide",
+                            imageVector = Icons.AutoMirrored.Filled.HelpOutline,
+                            contentDescription = "Pairing Guide",
                             tint = if (isGuideExpanded) TealSecondary else TextPrimaryDark
                         )
                     }
@@ -352,7 +413,7 @@ fun ViewOnceVaultScreen(
             // Dual view: Both kept alive in memory so WebView session persists seamlessly
             Box(modifier = Modifier.fillMaxSize()) {
                 // Tab 0: Embedded WhatsApp Web
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .alpha(if (selectedTab == 0) 1f else 0f)
@@ -367,6 +428,47 @@ fun ViewOnceVaultScreen(
                         )
                     }
 
+                    // Single-Phone Pairing Banner & Code Card
+                    if (connectionStatus != "AUTHENTICATED") {
+                        if (pairingCode != null) {
+                            PairingCodeCard(
+                                pairingCode = pairingCode!!,
+                                onCopyCode = {
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                    val clip = android.content.ClipData.newPlainText("WhatsApp Pairing Code", pairingCode)
+                                    clipboard.setPrimaryClip(clip)
+                                    Toast.makeText(context, "Pairing code copied!", Toast.LENGTH_SHORT).show()
+                                },
+                                onOpenWhatsApp = {
+                                    val launchIntent = context.packageManager.getLaunchIntentForPackage("com.whatsapp")
+                                    if (launchIntent != null) {
+                                        context.startActivity(launchIntent)
+                                    } else {
+                                        Toast.makeText(context, "WhatsApp is not installed", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            )
+                        } else {
+                            SinglePhoneLinkBanner(
+                                onLinkWithPhone = {
+                                    webViewRef?.evaluateJavascript(
+                                        "window.__notiVaultLinkWithPhone && window.__notiVaultLinkWithPhone();",
+                                        null
+                                    )
+                                    Toast.makeText(context, "Requesting phone number link on screen...", Toast.LENGTH_SHORT).show()
+                                },
+                                onOpenWhatsApp = {
+                                    val launchIntent = context.packageManager.getLaunchIntentForPackage("com.whatsapp")
+                                    if (launchIntent != null) {
+                                        context.startActivity(launchIntent)
+                                    } else {
+                                        Toast.makeText(context, "WhatsApp is not installed", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            )
+                        }
+                    }
+
                     AndroidView(
                         factory = { ctx ->
                             createConfiguredWebView(
@@ -377,10 +479,15 @@ fun ViewOnceVaultScreen(
                                 },
                                 onStatusUpdate = { status ->
                                     viewModel.updateConnectionStatus(status)
+                                },
+                                onPairingCode = { code ->
+                                    viewModel.updatePairingCode(code)
                                 }
                             ).also { webViewRef = it }
                         },
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
                     )
                 }
 
@@ -415,7 +522,7 @@ private fun ConnectionStatusStrip(
     val (statusColor, statusText, statusIcon) = when {
         isLoading -> Triple(Color(0xFF38BDF8), "Loading WhatsApp Web client...", Icons.Default.Refresh)
         status == "AUTHENTICATED" -> Triple(Color(0xFF22C55E), "Linked Device Active • View-Once Auto-Saver Armed", Icons.Default.CheckCircle)
-        status == "QR_READY" -> Triple(Color(0xFFFBBF24), "Ready to Link • Scan QR code below to connect", Icons.Default.QrCodeScanner)
+        status == "QR_READY" -> Triple(Color(0xFFFBBF24), "Ready to Link • Link with phone number or scan QR", Icons.Default.QrCodeScanner)
         status == "ERROR" -> Triple(DeletedRed, "Connection issue • Tap reload in top bar", Icons.Default.Warning)
         else -> Triple(TealSecondary, "Initializing Linked Engine...", Icons.Default.AutoAwesome)
     }
@@ -459,7 +566,7 @@ private fun QrConnectionGuideCard(onDismiss: () -> Unit) {
             .padding(12.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = DarkSurface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, TealSecondary.copy(alpha = 0.3f))
+        border = BorderStroke(1.dp, TealSecondary.copy(alpha = 0.3f))
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
@@ -493,18 +600,24 @@ private fun QrConnectionGuideCard(onDismiss: () -> Unit) {
             Spacer(modifier = Modifier.height(10.dp))
 
             val steps = listOf(
-                "1. Open WhatsApp on your primary smartphone.",
-                "2. Tap Menu (⋮) on Android or Settings on iPhone.",
-                "3. Select Linked Devices > Tap Link a Device.",
-                "4. Scan the QR code shown below in the Linked Web tab.",
-                "5. When someone sends a View-Once photo or video, it is intercepted in original decrypted quality and vaulted here permanently!"
+                "Method 1: Single Phone Link (No QR scan needed):",
+                "• Tap 'Link Phone #' above in the banner or on WhatsApp Web.",
+                "• Enter your WhatsApp phone number on screen.",
+                "• Copy the 8-character pairing code that appears.",
+                "• Tap 'Open WhatsApp' > Menu (⋮) > Linked Devices > Link a Device > 'Link with phone number instead' > Enter code!",
+                "",
+                "Method 2: Using another device:",
+                "• Open WhatsApp on another phone and scan the QR code displayed below.",
+                "",
+                "Once linked, any View-Once photo or video opened is captured in original quality and vaulted permanently!"
             )
 
             steps.forEach { step ->
                 Text(
                     text = step,
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondaryDark,
+                    color = if (step.startsWith("Method")) TealSecondary else TextSecondaryDark,
+                    fontWeight = if (step.startsWith("Method")) FontWeight.Bold else FontWeight.Normal,
                     modifier = Modifier.padding(vertical = 2.dp)
                 )
             }
@@ -690,7 +803,8 @@ private fun createConfiguredWebView(
     context: Context,
     onLoadingChanged: (Boolean) -> Unit,
     onMediaCaptured: (String, String, Boolean) -> Unit,
-    onStatusUpdate: (String) -> Unit
+    onStatusUpdate: (String) -> Unit,
+    onPairingCode: (String) -> Unit
 ): WebView {
     val webView = WebView(context).apply {
         layoutParams = ViewGroup.LayoutParams(
@@ -732,6 +846,11 @@ private fun createConfiguredWebView(
         @JavascriptInterface
         fun onStatusUpdate(status: String) {
             onStatusUpdate(status)
+        }
+
+        @JavascriptInterface
+        fun onPairingCode(code: String) {
+            onPairingCode(code)
         }
 
         @JavascriptInterface
@@ -795,4 +914,135 @@ private fun createConfiguredWebView(
 
     webView.loadUrl(WHATSAPP_WEB_URL)
     return webView
+}
+
+@Composable
+private fun PairingCodeCard(
+    pairingCode: String,
+    onCopyCode: () -> Unit,
+    onOpenWhatsApp: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        border = BorderStroke(1.dp, Color(0xFF22C55E).copy(alpha = 0.5f))
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = Color(0xFF22C55E),
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "WhatsApp Pairing Code (No Camera Needed)",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = TextPrimaryDark,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF0C2920))
+                    .border(1.dp, Color(0xFF22C55E).copy(alpha = 0.8f), RoundedCornerShape(8.dp))
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = pairingCode,
+                    style = MaterialTheme.typography.headlineMedium.copy(letterSpacing = 4.sp),
+                    color = Color(0xFF4ADE80),
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = onCopyCode,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22C55E)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Default.ContentCopy, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Copy Code", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+                Button(
+                    onClick = onOpenWhatsApp,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = TealSecondary),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Default.Devices, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Open WhatsApp", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "১. কোডটি কপি করুন। ২. Open WhatsApp চাপুন -> Menu (⋮) -> Linked Devices -> Link a Device -> 'Link with phone number instead' এ গিয়ে কোডটি বসিয়ে দিন।",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondaryDark
+            )
+        }
+    }
+}
+
+@Composable
+private fun SinglePhoneLinkBanner(
+    onLinkWithPhone: () -> Unit,
+    onOpenWhatsApp: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        border = BorderStroke(1.dp, TealSecondary.copy(alpha = 0.35f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Single Phone Linking",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = TextPrimaryDark,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Can't scan your own phone's screen? Link with phone number instead!",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondaryDark
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(
+                onClick = onLinkWithPhone,
+                colors = ButtonDefaults.buttonColors(containerColor = TealSecondary),
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Icon(Icons.Default.Dialpad, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Link Phone #", color = Color.Black, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
 }

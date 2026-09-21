@@ -181,14 +181,7 @@ class MediaObserverService : Service() {
                         val relPath = if (relPathIdx >= 0) cursor.getString(relPathIdx) ?: "" else ""
 
                         val itemUri = Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id.toString())
-                        val combined = "$data/$relPath/$name".lowercase()
-                        val detectedPackage = when {
-                            combined.contains("whatsapp") -> "com.whatsapp"
-                            combined.contains("telegram") -> "org.telegram.messenger"
-                            combined.contains("messenger") -> "com.facebook.orca"
-                            combined.contains("instagram") -> "com.instagram.android"
-                            else -> "unknown.mediastore"
-                        }
+                        val detectedPackage = MediaStoreObserver.resolveMessagingPackage(data, relPath, name) ?: continue
                         handleMediaStoreChange(itemUri, name, mime, detectedPackage)
                     }
                 }
@@ -201,6 +194,7 @@ class MediaObserverService : Service() {
     private fun handleNewMediaFile(file: File, packageName: String) {
         serviceScope.launch {
             val app = application as? NotiVaultApp ?: return@launch
+            if (MediaStoreObserver.isBlacklisted(file.absolutePath, "", file.name)) return@launch
 
             // Check if already backed up before writing a new copy to disk
             val existing = app.mediaRepository.getMediaByOriginalPath(file.absolutePath)
@@ -245,6 +239,8 @@ class MediaObserverService : Service() {
     private fun handleMediaStoreChange(uri: Uri, name: String, mime: String, packageName: String) {
         serviceScope.launch {
             val app = application as? NotiVaultApp ?: return@launch
+            if (packageName.isBlank() || packageName == "unknown.mediastore") return@launch
+            if (MediaStoreObserver.isBlacklisted("", "", name)) return@launch
 
             // Check if already backed up before writing a new copy to disk
             val existing = app.mediaRepository.getMediaByOriginalPath(uri.toString())

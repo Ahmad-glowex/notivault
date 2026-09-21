@@ -19,11 +19,9 @@ import com.notivault.app.ui.theme.TealSecondary
 enum class AppTab(val label: String, val packageName: String?) {
     ALL("All", null),
     WHATSAPP("WhatsApp", "com.whatsapp"),
-    MESSENGER("Messenger", "com.facebook.orca"),
-    INSTAGRAM("Instagram", "com.instagram.android"),
     TELEGRAM("Telegram", "org.telegram.messenger"),
-    SAVED_MEDIA("Saved Media", "MEDIA_TAB"),
-    VIEW_ONCE("View-Once Vault", "VIEW_ONCE_TAB")
+    MESSENGER("Messenger", "com.facebook.orca"),
+    INSTAGRAM("Instagram", "com.instagram.android")
 }
 
 @Composable

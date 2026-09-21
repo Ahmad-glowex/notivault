@@ -58,53 +58,49 @@ fun MessageBubble(
     val isSelf = message.isSelf
     val isDeleted = message.isDeleted
     val bubbleColor = when {
-        isDeleted -> DarkSurfaceVariant
-        isSelf -> TealDark
-        else -> DarkSurfaceVariant
+        isDeleted -> Color(0xFF241418)
+        isSelf -> Color(0xFF0D5A54)
+        else -> Color(0xFF1E293B)
+    }
+    val borderColor = when {
+        isDeleted -> DeletedRed.copy(alpha = 0.6f)
+        isSelf -> Color(0xFF14B8A6).copy(alpha = 0.3f)
+        else -> Color(0xFF334155).copy(alpha = 0.6f)
     }
     val alignment = if (isSelf) Alignment.End else Alignment.Start
 
     val timeFormatted = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(message.timestamp))
     val mediaFile = message.mediaUri?.let { File(it) }?.takeIf { it.exists() }
+    val isVideo = message.mediaMimeType?.startsWith("video") == true ||
+            message.mediaUri?.endsWith(".mp4", ignoreCase = true) == true
 
     val isViewOnce = message.messageText.contains("view once", ignoreCase = true) ||
-            message.messageText.contains("opened", ignoreCase = true)
+            message.messageText.contains("opened", ignoreCase = true) ||
+            message.messageText.contains("ভিউ ওয়ান্স", ignoreCase = true) ||
+            message.messageText.contains("একবার দেখার", ignoreCase = true)
     val isPhoto = message.messageText.contains("photo", ignoreCase = true) ||
             message.messageText.contains("📷") || message.messageText.contains("ছবি")
+
+    val bubbleShape = RoundedCornerShape(
+        topStart = 16.dp,
+        topEnd = 16.dp,
+        bottomStart = if (isSelf) 16.dp else 4.dp,
+        bottomEnd = if (isSelf) 4.dp else 16.dp
+    )
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 3.dp),
         horizontalAlignment = alignment
     ) {
         Box(
             modifier = Modifier
                 .widthIn(min = 120.dp, max = 320.dp)
-                .clip(
-                    RoundedCornerShape(
-                        topStart = 16.dp,
-                        topEnd = 16.dp,
-                        bottomStart = if (isSelf) 16.dp else 4.dp,
-                        bottomEnd = if (isSelf) 4.dp else 16.dp
-                    )
-                )
-                .then(
-                    if (isDeleted) {
-                        Modifier.border(
-                            1.dp,
-                            DeletedRed.copy(alpha = 0.6f),
-                            RoundedCornerShape(
-                                topStart = 16.dp,
-                                topEnd = 16.dp,
-                                bottomStart = if (isSelf) 16.dp else 4.dp,
-                                bottomEnd = if (isSelf) 4.dp else 16.dp
-                            )
-                        )
-                    } else Modifier
-                )
+                .clip(bubbleShape)
+                .border(1.dp, borderColor, bubbleShape)
                 .background(bubbleColor)
-                .padding(12.dp)
+                .padding(horizontal = 12.dp, vertical = 10.dp)
         ) {
             Column {
                 // In group chats, display sender name
@@ -145,7 +141,7 @@ fun MessageBubble(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (isCached) "View Once Preserved" else "View Once (Notification Only)",
+                            text = if (isCached) "View Once Preserved" else "View Once Notification",
                             style = MaterialTheme.typography.labelSmall,
                             color = if (isCached) TealSecondary else Color(0xFFF59E0B),
                             fontWeight = FontWeight.SemiBold
@@ -159,55 +155,77 @@ fun MessageBubble(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 220.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color.Black.copy(alpha = 0.3f))
+                            .heightIn(max = 240.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color.Black.copy(alpha = 0.4f))
                             .clickable { onMediaClick?.invoke(mediaFile.absolutePath) }
                     ) {
                         AsyncImage(
                             model = mediaFile,
-                            contentDescription = "Cached Media",
+                            contentDescription = "Attached Media",
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 220.dp),
+                                .heightIn(max = 240.dp),
                             contentScale = ContentScale.Crop
                         )
+
+                        if (isVideo) {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Videocam,
+                                    contentDescription = "Play Video",
+                                    tint = Color.White.copy(alpha = 0.9f),
+                                    modifier = Modifier.size(40.dp)
+                                )
+                            }
+                        }
                     }
                     Spacer(modifier = Modifier.height(6.dp))
                 }
 
                 // Message Text Content
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (isPhoto && mediaFile == null) {
-                        Icon(
-                            imageVector = Icons.Default.CameraAlt,
-                            contentDescription = null,
-                            tint = TealSecondary,
-                            modifier = Modifier.size(16.dp)
+                if (message.messageText.isNotBlank()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (isPhoto && mediaFile == null) {
+                            Icon(
+                                imageVector = Icons.Default.CameraAlt,
+                                contentDescription = null,
+                                tint = TealSecondary,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
+                        Text(
+                            text = message.messageText,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = TextPrimaryDark,
+                            fontWeight = if (isDeleted) FontWeight.SemiBold else FontWeight.Normal
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
                     }
-                    Text(
-                        text = message.messageText,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = if (isDeleted) TextPrimaryDark else TextPrimaryDark,
-                        fontWeight = if (isDeleted) FontWeight.SemiBold else FontWeight.Normal
-                    )
                 }
 
-                // Fallback media indicator if file was not available locally
-                if (message.hasMedia && mediaFile == null) {
+                // Subtle media indicator only if a media URI was logged but missing on disk
+                if (message.hasMedia && !message.mediaUri.isNullOrBlank() && mediaFile == null) {
                     Spacer(modifier = Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color.White.copy(alpha = 0.05f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Attachment,
                             contentDescription = "Attachment",
                             tint = TextSecondaryDark,
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(12.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Media not saved to device storage",
+                            text = "Media attachment not available locally",
                             style = MaterialTheme.typography.labelSmall,
                             color = TextSecondaryDark
                         )
@@ -226,6 +244,15 @@ fun MessageBubble(
                         style = MaterialTheme.typography.labelSmall,
                         color = TextSecondaryDark
                     )
+                    if (isSelf) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = "Sent",
+                            tint = TealSecondary,
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
                 }
             }
         }

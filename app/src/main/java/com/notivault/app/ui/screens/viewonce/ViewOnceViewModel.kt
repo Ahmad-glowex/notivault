@@ -37,8 +37,19 @@ class ViewOnceViewModel(application: Application) : AndroidViewModel(application
     private val _lastCapturedTime = MutableStateFlow<Long?>(null)
     val lastCapturedTime: StateFlow<Long?> = _lastCapturedTime.asStateFlow()
 
+    private val _pairingCode = MutableStateFlow<String?>(null)
+    val pairingCode: StateFlow<String?> = _pairingCode.asStateFlow()
+
     fun updateConnectionStatus(status: String) {
         _connectionStatus.value = status
+    }
+
+    fun updatePairingCode(code: String?) {
+        _pairingCode.value = code
+    }
+
+    fun clearPairingCode() {
+        _pairingCode.value = null
     }
 
     fun toggleGuide() {

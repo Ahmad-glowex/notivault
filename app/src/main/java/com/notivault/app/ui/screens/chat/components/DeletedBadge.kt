@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.notivault.app.ui.theme.DeletedBadgeBorder
 import com.notivault.app.ui.theme.DeletedRed
@@ -37,9 +38,9 @@ fun DeletedBadge(
 
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(DeletedRedBg)
-            .border(1.dp, DeletedBadgeBorder.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(8.dp))
+            .background(DeletedRed.copy(alpha = 0.15f))
+            .border(1.dp, DeletedRed.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -47,14 +48,14 @@ fun DeletedBadge(
             imageVector = Icons.Default.DeleteForever,
             contentDescription = "Deleted",
             tint = DeletedRed,
-            modifier = Modifier.size(14.dp)
+            modifier = Modifier.size(13.dp)
         )
-        Spacer(modifier = Modifier.width(4.dp))
+        Spacer(modifier = Modifier.width(5.dp))
         Text(
-            text = "DELETED BY SENDER ($timeStr) • PRESERVED",
+            text = "Preserved Unsent Message • $timeStr",
             style = MaterialTheme.typography.labelSmall,
-            color = DeletedBadgeBorder,
-            fontWeight = FontWeight.Bold
+            color = Color(0xFFFCA5A5),
+            fontWeight = FontWeight.SemiBold
         )
     }
 }
