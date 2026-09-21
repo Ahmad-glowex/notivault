@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">NotiVault</string>
+    <string name="notification_service_label">NotiVault Notification Listener</string>
+    <string name="notification_channel_name">NotiVault Service Channel</string>
+    <string name="notification_channel_desc">Shows background status for NotiVault media observer</string>
+    <string name="media_service_running">NotiVault media observer is active</string>
+</resources>

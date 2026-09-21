@@ -1,0 +1,38 @@
+package com.notivault.app.data.local.dao
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import com.notivault.app.data.local.entity.MediaEntity
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface MediaDao {
+    @Query("SELECT * FROM saved_media ORDER BY timestamp DESC")
+    fun getAllMedia(): Flow<List<MediaEntity>>
+
+    @Query("SELECT * FROM saved_media WHERE mediaType = :type ORDER BY timestamp DESC")
+    fun getMediaByType(type: String): Flow<List<MediaEntity>>
+
+    @Query("SELECT * FROM saved_media WHERE threadId = :threadId ORDER BY timestamp DESC")
+    fun getMediaForThread(threadId: String): Flow<List<MediaEntity>>
+
+    @Query("SELECT * FROM saved_media WHERE id = :id LIMIT 1")
+    suspend fun getMediaById(id: Long): MediaEntity?
+
+    @Query("SELECT * FROM saved_media WHERE originalPath = :originalPath LIMIT 1")
+    suspend fun getMediaByOriginalPath(originalPath: String): MediaEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMedia(media: MediaEntity): Long
+
+    @Query("SELECT COUNT(*) FROM saved_media")
+    fun getMediaCount(): Flow<Int>
+
+    @Query("DELETE FROM saved_media WHERE id = :id")
+    suspend fun deleteMedia(id: Long)
+
+    @Query("DELETE FROM saved_media")
+    suspend fun deleteAllMedia()
+}

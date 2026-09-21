@@ -1,0 +1,69 @@
+package com.notivault.app.data.local.dao
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import com.notivault.app.data.local.entity.MessageEntity
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface MessageDao {
+    @Query("SELECT * FROM messages WHERE threadId = :threadId ORDER BY timestamp ASC")
+    fun getMessagesForThread(threadId: String): Flow<List<MessageEntity>>
+
+    @Query("SELECT * FROM messages WHERE threadId = :threadId ORDER BY timestamp DESC LIMIT :limit")
+    suspend fun getRecentMessagesForThread(threadId: String, limit: Int = 20): List<MessageEntity>
+
+    @Query("""
+        SELECT * FROM messages 
+        WHERE threadId = :threadId 
+          AND senderName = :senderName 
+          AND isDeleted = 0 
+        ORDER BY timestamp DESC 
+        LIMIT 1
+    """)
+    suspend fun getLatestActiveMessageBySender(threadId: String, senderName: String): MessageEntity?
+
+    @Query("""
+        SELECT * FROM messages 
+        WHERE threadId = :threadId 
+          AND isDeleted = 0 
+        ORDER BY timestamp DESC 
+        LIMIT 1
+    """)
+    suspend fun getLatestActiveMessageInThread(threadId: String): MessageEntity?
+
+    @Query("""
+        UPDATE messages 
+        SET isDeleted = 1, deletedTimestamp = :deletedTimestamp 
+        WHERE id = :id
+    """)
+    suspend fun markMessageAsDeleted(id: Long, deletedTimestamp: Long)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMessage(message: MessageEntity): Long
+
+    @Query("""
+        SELECT * FROM messages 
+        WHERE messageText LIKE '%' || :query || '%' 
+           OR senderName LIKE '%' || :query || '%' 
+        ORDER BY timestamp DESC
+    """)
+    fun searchMessages(query: String): Flow<List<MessageEntity>>
+
+    @Query("SELECT COUNT(*) FROM messages WHERE isDeleted = 1")
+    fun getDeletedMessagesCount(): Flow<Int>
+
+    @Query("SELECT * FROM messages WHERE isDeleted = 1 ORDER BY deletedTimestamp DESC")
+    fun getAllDeletedMessages(): Flow<List<MessageEntity>>
+
+    @Query("DELETE FROM messages WHERE id = :id")
+    suspend fun deleteMessage(id: Long)
+
+    @Query("DELETE FROM messages WHERE isDeleted = 1")
+    suspend fun clearAllDeletedMessages()
+
+    @Query("DELETE FROM messages")
+    suspend fun deleteAllMessages()
+}

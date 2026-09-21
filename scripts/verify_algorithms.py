@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+"""
+Algorithm & Heuristics Verification Test Suite for NotiVault
+Tests DeletedMessageDetector regexes, NotificationParser sender separation, and CSV exporter logic.
+"""
+
+import re
+import unittest
+
+DELETED_PATTERNS = [
+    re.compile(r".*this message was deleted.*", re.IGNORECASE),
+    re.compile(r".*you deleted this message.*", re.IGNORECASE),
+    re.compile(r".*this message was deleted by the author.*", re.IGNORECASE),
+    re.compile(r".*unsent a message.*", re.IGNORECASE),
+    re.compile(r".*message was unsent.*", re.IGNORECASE),
+    re.compile(r".*message deleted.*", re.IGNORECASE),
+    re.compile(r".*message was removed.*", re.IGNORECASE),
+    re.compile(r".*este mensaje fue eliminado.*", re.IGNORECASE),
+    re.compile(r".*eliminó un mensaje.*", re.IGNORECASE),
+    re.compile(r".*esta mensagem foi apagada.*", re.IGNORECASE),
+    re.compile(r".*anulou o envio de uma mensagem.*", re.IGNORECASE),
+    re.compile(r".*ce message a été supprimé.*", re.IGNORECASE),
+    re.compile(r".*a annulé l'envoi d'un message.*", re.IGNORECASE),
+    re.compile(r".*diese nachricht wurde gelöscht.*", re.IGNORECASE),
+    re.compile(r".*hat eine nachricht zurückgerufen.*", re.IGNORECASE),
+    re.compile(r".*यह संदेश हटा दिया गया था.*", re.IGNORECASE),
+    re.compile(r".*বার্তাটি মুছে ফেলা হয়েছে.*", re.IGNORECASE),
+]
+
+MESSENGER_UNSENT_PATTERN = re.compile(r"^(.*)\s+unsent a message$", re.IGNORECASE)
+
+def is_deleted_notification(text: str | None) -> bool:
+    if not text or not text.strip():
+        return False
+    clean = text.strip()
+    return any(p.match(clean) is not None for p in DELETED_PATTERNS)
+
+def extract_unsent_author(text: str | None, fallback: str) -> str:
+    if not text:
+        return fallback
+    m = MESSENGER_UNSENT_PATTERN.match(text.strip())
+    if m:
+        extracted = m.group(1).strip()
+        if extracted and extracted.lower() != "you":
+            return extracted
+    return fallback
+
+def resolve_title_and_sender(pkg: str, raw_title: str, text: str, conv_title: str | None, is_group: bool):
+    if conv_title and conv_title.strip():
+        chat_title = conv_title.strip()
+        if raw_title.strip() and raw_title != conv_title:
+            sender_name = raw_title.strip()
+            msg_text = text
+        elif ": " in text:
+            parts = text.split(": ", 1)
+            sender_name = parts[0].strip()
+            msg_text = parts[1].strip()
+        else:
+            sender_name = raw_title.strip() or chat_title
+            msg_text = text
+    else:
+        if is_group and ": " in text:
+            parts = text.split(": ", 1)
+            chat_title = raw_title.strip() or "Group Chat"
+            sender_name = parts[0].strip()
+            msg_text = parts[1].strip()
+        else:
+            chat_title = raw_title.strip() or "Direct Message"
+            sender_name = chat_title
+            msg_text = text
+    return chat_title, sender_name, msg_text
+
+def escape_csv(val: str) -> str:
+    escaped = val.replace('"', '""').replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ')
+    return f'"{escaped}"'
+
+
+class TestNotiVaultAlgorithms(unittest.TestCase):
+
+    def test_whatsapp_detection(self):
+        self.assertTrue(is_deleted_notification("This message was deleted"))
+        self.assertTrue(is_deleted_notification("this message was deleted"))
+        self.assertTrue(is_deleted_notification("You deleted this message"))
+        self.assertTrue(is_deleted_notification("This message was deleted by the author"))
+        self.assertTrue(is_deleted_notification("Message deleted"))
+
+    def test_multilingual_detection(self):
+        self.assertTrue(is_deleted_notification("Este mensaje fue eliminado"))
+        self.assertTrue(is_deleted_notification("Esta mensagem foi apagada"))
+        self.assertTrue(is_deleted_notification("Ce message a été supprimé"))
+        self.assertTrue(is_deleted_notification("Diese Nachricht wurde gelöscht"))
+        self.assertTrue(is_deleted_notification("বার্তাটি মুছে ফেলা হয়েছে"))
+
+    def test_messenger_detection_and_author_extraction(self):
+        self.assertTrue(is_deleted_notification("You unsent a message"))
+        self.assertTrue(is_deleted_notification("Alice unsent a message"))
+        self.assertEqual(extract_unsent_author("Alice unsent a message", "Default"), "Alice")
+        self.assertEqual(extract_unsent_author("You unsent a message", "Default"), "Default")
+
+    def test_non_deleted_messages(self):
+        self.assertFalse(is_deleted_notification("Hey there, how are you doing?"))
+        self.assertFalse(is_deleted_notification("I deleted the old repo yesterday"))
+        self.assertFalse(is_deleted_notification(""))
+        self.assertFalse(is_deleted_notification(None))
+
+    def test_notification_parser_direct_message(self):
+        title, sender, text = resolve_title_and_sender("com.whatsapp", "John Doe", "Hello!", None, False)
+        self.assertEqual(title, "John Doe")
+        self.assertEqual(sender, "John Doe")
+        self.assertEqual(text, "Hello!")
+
+    def test_notification_parser_group_with_prefix(self):
+        title, sender, text = resolve_title_and_sender("com.whatsapp", "Alpha Team", "Bob: Meeting at 3pm", "Alpha Team", True)
+        self.assertEqual(title, "Alpha Team")
+        self.assertEqual(sender, "Bob")
+        self.assertEqual(text, "Meeting at 3pm")
+
+    def test_notification_parser_multiple_colons(self):
+        title, sender, text = resolve_title_and_sender("com.whatsapp", "Alpha Team", "Alice: Note: Meeting at 3pm: urgent", "Alpha Team", True)
+        self.assertEqual(title, "Alpha Team")
+        self.assertEqual(sender, "Alice")
+        self.assertEqual(text, "Note: Meeting at 3pm: urgent")
+
+    def test_hindi_bengali_deleted(self):
+        self.assertTrue(is_deleted_notification("এই বার্তাটি মুছে ফেলা হয়েছে"))
+        self.assertTrue(is_deleted_notification("यह संदेश हटा दिया गया था"))
+
+    def test_csv_escaping(self):
+        self.assertEqual(escape_csv("Hello, World!"), '"Hello, World!"')
+        self.assertEqual(escape_csv('He said "hello".'), '"He said ""hello""."')
+        self.assertEqual(escape_csv("Line 1\nLine 2\rLine 3"), '"Line 1 Line 2 Line 3"')
+        self.assertEqual(escape_csv("Line 1\r\nLine 2"), '"Line 1 Line 2"')
+
+
+if __name__ == '__main__':
+    unittest.main()
