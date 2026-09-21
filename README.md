@@ -143,7 +143,7 @@ NotiVault includes an authoritative technical engineering whitepaper explaining 
 ### Building via Terminal
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/notivault.git
+   git clone https://github.com/Ahmad-glowex/notivault.git
    cd notivault
    ```
 2. Build debug APK:
