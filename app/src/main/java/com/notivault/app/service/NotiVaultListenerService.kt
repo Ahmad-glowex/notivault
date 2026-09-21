@@ -8,6 +8,7 @@ import com.notivault.app.data.local.entity.AppEntity
 import com.notivault.app.service.parser.NotificationParser
 import com.notivault.app.service.media.MediaCacheManager
 import com.notivault.app.service.media.MediaObserverService
+import com.notivault.app.service.media.RootViewOnceManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -163,6 +164,7 @@ class NotiVaultListenerService : NotificationListenerService() {
                                         item.messageText.contains("view once", ignoreCase = true) ||
                                         item.messageText.contains("একবার দেখার")
                                 if (isViewOnce) {
+                                    RootViewOnceManager.triggerCapture(this@NotiVaultListenerService, item.packageName, serviceScope)
                                     MediaObserverService.triggerViewOnceSniff(this@NotiVaultListenerService, item.packageName)
                                 }
                             } catch (e: Exception) {

@@ -199,17 +199,7 @@ fun MessageBubble(
 
                 // Message Text Content
                 val cleanMsgText = message.messageText.trim()
-                val isPlaceholderText = cleanMsgText.isBlank() ||
-                        cleanMsgText.contains("Sent a photo", ignoreCase = true) ||
-                        cleanMsgText.contains("sent a photo", ignoreCase = true) ||
-                        cleanMsgText.equals("Photo", ignoreCase = true) ||
-                        cleanMsgText.equals("📷 Photo", ignoreCase = true) ||
-                        cleanMsgText.equals("ছবি", ignoreCase = true) ||
-                        cleanMsgText.equals("📷", ignoreCase = true) ||
-                        cleanMsgText.equals("Video", ignoreCase = true) ||
-                        cleanMsgText.equals("🎥 Video", ignoreCase = true) ||
-                        cleanMsgText.contains("Sent a video", ignoreCase = true) ||
-                        cleanMsgText.equals("ভিডিও", ignoreCase = true)
+                val isPlaceholderText = isMediaPlaceholderText(cleanMsgText)
 
                 // Only render text if: not a media placeholder when media is attached, OR media is absent
                 val shouldRenderText = if (mediaFile != null) !isPlaceholderText else cleanMsgText.isNotBlank()
@@ -302,4 +292,43 @@ fun MessageBubble(
             }
         }
     }
+}
+
+/**
+ * Checks if a message text is simply a placeholder for an attached photo, video, or View-Once item.
+ * When media is physically available, returning true suppresses the duplicate text label in the bubble.
+ */
+fun isMediaPlaceholderText(text: String): Boolean {
+    val clean = text.trim()
+    if (clean.isBlank()) return true
+    val stripped = clean
+        .replace("📷", "")
+        .replace("📸", "")
+        .replace("🎥", "")
+        .replace("🎬", "")
+        .replace("①", "")
+        .replace("➀", "")
+        .replace("\u2460", "")
+        .trim()
+
+    if (stripped.isBlank()) return true
+
+    val lower = stripped.lowercase()
+    return lower == "photo" ||
+            lower == "sent a photo" ||
+            lower == "video" ||
+            lower == "sent a video" ||
+            lower == "view once" ||
+            lower == "view once photo" ||
+            lower == "view once video" ||
+            lower == "opened" ||
+            lower == "ছবি" ||
+            lower == "ভিডিও" ||
+            lower == "একটি ছবি পাঠিয়েছেন" ||
+            lower == "একটি ভিডিও পাঠিয়েছেন" ||
+            lower == "একবার দেখার ছবি" ||
+            lower == "একবার দেখার ভিডিও" ||
+            lower == "ভিউ ওয়ান্স" ||
+            lower.contains("sent a photo") ||
+            lower.contains("sent a video")
 }

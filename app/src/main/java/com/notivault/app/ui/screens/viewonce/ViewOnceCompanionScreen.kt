@@ -19,9 +19,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Collections
-import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Button
@@ -41,7 +43,10 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -50,6 +55,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.notivault.app.NotiVaultApp
 import com.notivault.app.service.media.MediaObserverService
+import com.notivault.app.service.media.RootViewOnceManager
+import com.notivault.app.service.media.ViewOnceSimulator
 import com.notivault.app.ui.theme.DarkBackground
 import com.notivault.app.ui.theme.DarkSurface
 import com.notivault.app.ui.theme.TealSecondary
@@ -67,6 +74,8 @@ fun ViewOnceCompanionScreen(
     val app = context.applicationContext as NotiVaultApp
     val coroutineScope = rememberCoroutineScope()
     val viewOnceCount by app.mediaRepository.getViewOnceMediaCount().collectAsState(initial = 0)
+    var isSimulating by remember { mutableStateOf(false) }
+    val isRoot = remember { RootViewOnceManager.isRootAvailable() }
 
     Scaffold(
         topBar = {
@@ -80,7 +89,7 @@ fun ViewOnceCompanionScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Auto-Capture Engine: ACTIVE (Sniper Mode)",
+                            text = if (isRoot) "Root Sandbox Sniper: ARMED" else "Dual Pipeline: Active",
                             style = MaterialTheme.typography.labelSmall,
                             color = TealSecondary
                         )
@@ -108,7 +117,7 @@ fun ViewOnceCompanionScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Status Card
+            // Engine Status Card
             Card(
                 colors = CardDefaults.cardColors(containerColor = DarkSurface),
                 shape = RoundedCornerShape(12.dp)
@@ -121,7 +130,7 @@ fun ViewOnceCompanionScreen(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                imageVector = Icons.Default.Radar,
+                                imageVector = if (isRoot) Icons.Default.FlashOn else Icons.Default.Radar,
                                 contentDescription = null,
                                 tint = TealSecondary,
                                 modifier = Modifier.size(24.dp)
@@ -129,13 +138,13 @@ fun ViewOnceCompanionScreen(
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = "Deep Cache Sniffer",
+                                    text = if (isRoot) "Root Sandbox Extractor" else "Direct Staging Observer",
                                     style = MaterialTheme.typography.titleSmall,
                                     color = TextPrimaryDark,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "Monitoring .Shared & WhatsApp Staging",
+                                    text = if (isRoot) "Direct /data/data sandbox access" else "Monitoring media pipeline & staging",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = TextSecondaryDark
                                 )
@@ -150,7 +159,7 @@ fun ViewOnceCompanionScreen(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "RUNNING",
+                                text = "ACTIVE",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = TealSecondary,
                                 fontWeight = FontWeight.Bold
@@ -174,7 +183,7 @@ fun ViewOnceCompanionScreen(
                                 color = TextSecondaryDark
                             )
                             Text(
-                                text = "$viewOnceCount Items Saved",
+                                text = "$viewOnceCount Items Preserved",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = TextPrimaryDark,
                                 fontWeight = FontWeight.Bold
@@ -194,7 +203,69 @@ fun ViewOnceCompanionScreen(
                 }
             }
 
-            // How it works Card
+            // Test & Verification Card
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F2E2B)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Science,
+                            contentDescription = null,
+                            tint = TealSecondary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "ভেরিফিকেশন টেস্ট (Chat Bubble Test)",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = TextPrimaryDark,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "এই বাটনে চাপ দিলে একটি রিয়েল টেস্ট ইমেজ তৈরি হয়ে আপনার লেটেস্ট ভিউ-ওয়ান্স মেসেজে সরাসরি যুক্ত হবে। এরপর চ্যাট স্ক্রিনে ঢুকলেই দেখতে পাবেন '📷 ① Sent a photo' টেক্সট আর নেই, সরাসরি ছবি দেখা যাচ্ছে!",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFFCBD5E1),
+                        lineHeight = MaterialTheme.typography.bodyMedium.lineHeight
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                isSimulating = true
+                                val success = ViewOnceSimulator.injectTestViewOnceMedia(context)
+                                isSimulating = false
+                                if (success) {
+                                    Toast.makeText(
+                                        context,
+                                        "টেস্ট সফল! এখন চ্যাট ওপেন করে ভিউ-ওয়ান্স ছবি সরাসরি দেখুন।",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                } else {
+                                    Toast.makeText(context, "টেস্ট ব্যর্থ হয়েছে।", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        enabled = !isSimulating,
+                        colors = ButtonDefaults.buttonColors(containerColor = TealSecondary),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.Science, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isSimulating) "ইনজেকশন চলছে..." else "চ্যাট বাবল টেস্ট চালান (Inject Test Image)",
+                            color = Color.Black,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            // Operations & Manual Trigger Card
             Card(
                 colors = CardDefaults.cardColors(containerColor = DarkSurface),
                 shape = RoundedCornerShape(12.dp)
@@ -209,7 +280,7 @@ fun ViewOnceCompanionScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "How View-Once Capture Operates",
+                            text = "How View-Once Extraction Works",
                             style = MaterialTheme.typography.titleSmall,
                             color = TextPrimaryDark,
                             fontWeight = FontWeight.Bold
@@ -217,9 +288,9 @@ fun ViewOnceCompanionScreen(
                     }
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = "1. Auto-Trigger: When an incoming notification says '① Photo' or 'View once', NotiVault automatically triggers high-frequency sniper polling.\n\n" +
-                                "2. Binary Magic Bytes: WhatsApp writes the media to its staging cache (.Shared or temp files). NotiVault reads the binary headers (JPEG/PNG/MP4 magic bytes) and scoops up the file immediately.\n\n" +
-                                "3. Permanent Vault Protection: Even though WhatsApp blocks screenshots and deletes the file from memory upon closing, NotiVault has already secured a permanent decrypted copy in your private offline vault!",
+                        text = "১. স্বয়ংক্রিয় ডিটেকশন: সেন্ডার যখন '① Photo' পাঠায়, NotiVault তাৎক্ষণিক হাই-স্পিড স্নাইপার সক্রিয় করে।\n\n" +
+                                "২. রুট স্যান্ডবক্স মোড: ফোন রুটেড থাকলে NotiVault সরাসরি WhatsApp-এর এনক্রিপ্টেড ফোল্ডার (/data/data/com.whatsapp/files/ViewOnce) থেকে বাইনারি ম্যাজিক বাইটস ডিটেক্ট করে ছবি সংগ্রহ করে চ্যাট বাবলে শো করায়।\n\n" +
+                                "৩. নন-রুট মোড (LSPatch / WaEnhancer): নন-রুট ডিভাইসে WhatsApp-এর ইন্টিগ্রেশন চালু থাকলে WhatsApp স্বয়ংক্রিয়ভাবে ছবি সেভ করে এবং NotiVault তা মেসেজে সংযুক্ত করে ফেলে।",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color(0xFFCBD5E1),
                         lineHeight = MaterialTheme.typography.bodyMedium.lineHeight
@@ -228,8 +299,13 @@ fun ViewOnceCompanionScreen(
                     OutlinedButton(
                         onClick = {
                             coroutineScope.launch {
+                                val rootExtracted = if (isRoot) RootViewOnceManager.extractViewOnceFiles(context) else 0
                                 MediaObserverService.triggerViewOnceSniff(context, "com.whatsapp")
-                                Toast.makeText(context, "High-Speed View-Once Sniffer Triggered!", Toast.LENGTH_SHORT).show()
+                                if (rootExtracted > 0) {
+                                    Toast.makeText(context, "$rootExtracted টি View-Once মিডিয়া রুট দিয়ে উদ্ধার হয়েছে!", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "স্নাইপার স্ক্যান সফলভাবে সম্পন্ন হয়েছে!", Toast.LENGTH_SHORT).show()
+                                }
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -237,12 +313,12 @@ fun ViewOnceCompanionScreen(
                     ) {
                         Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Trigger Sniffer Scan Now")
+                        Text("ম্যানুয়াল স্নাইপার স্ক্যান চালান")
                     }
                 }
             }
 
-            // Zero-Touch Pairing Guide Card (Alternative)
+            // Architecture Info Card
             Card(
                 colors = CardDefaults.cardColors(containerColor = DarkSurface),
                 shape = RoundedCornerShape(12.dp)
@@ -250,14 +326,14 @@ fun ViewOnceCompanionScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            imageVector = Icons.Default.Key,
+                            imageVector = Icons.Default.Info,
                             contentDescription = null,
                             tint = Color(0xFF38BDF8),
                             modifier = Modifier.size(22.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Zero-Touch Pairing (No QR Code)",
+                            text = "ডিভাইস সাপোর্ট ও পারমিশন স্ট্যাটাস",
                             style = MaterialTheme.typography.titleSmall,
                             color = TextPrimaryDark,
                             fontWeight = FontWeight.Bold
@@ -265,7 +341,11 @@ fun ViewOnceCompanionScreen(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "For users who want media to auto-download without even tapping messages, WhatsApp supports 'Link with phone number' using an 8-digit text code (e.g. ABCD-1234) rather than scanning a QR code with a camera on the same screen. The staging sniffer above works automatically on all Android devices.",
+                        text = if (isRoot) {
+                            "✅ আপনার ডিভাইসে Root Privilege সক্রিয় আছে। NotiVault সরাসরি রুট এক্সিকিউশনের মাধ্যমে অভ্যন্তরীণ স্যান্ডবক্স থেকে ভিউ-ওয়ান্স ফাইল উদ্ধার করতে সক্ষম।"
+                        } else {
+                            "ℹ️ স্ট্যান্ডার্ড (নন-রুট) অ্যান্ড্রয়েড সিকিউরিটিতে কোনো অ্যাপ সরাসরি অন্য অ্যাপের অভ্যন্তরীণ ডেটা অ্যাক্সেস করতে পারে না। নন-রুট ডিভাইসে LSPatch + WaEnhancer ব্যবহার করলে ভিউ-ওয়ান্স ছবি সরাসরি সাধারণ ছবির মতো চলে আসে এবং NotiVault তা চ্যাট বাবলে সরাসরি শো করে।"
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondaryDark
                     )
@@ -289,7 +369,7 @@ fun ViewOnceCompanionScreen(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "Zero-Network Guarantee: All View-Once media is intercepted locally on your device. NotiVault has zero internet access permissions.",
+                        text = "জিরো-নেটওয়ার্ক গ্যারান্টি: সম্পূর্ণ প্রসেসিং আপনার ফোনের ইন্টারনাল মেমোরিতে সম্পন্ন হয়। NotiVault কোনো সার্ভারে ডাটা পাঠায় না।",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color(0xFFE2E8F0)
                     )
