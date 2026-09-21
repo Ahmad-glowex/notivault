@@ -8,11 +8,9 @@ import com.notivault.app.data.repository.MessageRepository
 import com.notivault.app.data.repository.MessageRepositoryImpl
 import com.notivault.app.data.repository.SettingsRepository
 import com.notivault.app.data.repository.SettingsRepositoryImpl
-import com.notivault.app.service.media.MediaObserverService
 import com.notivault.app.service.media.MediaStoreObserver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -38,17 +36,19 @@ class NotiVaultApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // Deduplicate existing messages and clean up legacy polluted media on startup
+        // Asynchronously purge any bulk-scanned orphan media, deduplicate messages, and register default apps
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                messageRepository.deduplicateExistingMessages()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-            cleanPollutedMediaRecords()
+                // 1. Immediately reclaim phone storage by deleting any bulk-cloned gallery media
+                purgeBulkImportedMedia()
 
-            // Pre-populate standard supported apps so user can immediately toggle in Settings
-            try {
+                // 2. Clean polluted media records
+                cleanPollutedMediaRecords()
+
+                // 3. Deduplicate messages
+                messageRepository.deduplicateExistingMessages()
+
+                // 4. Pre-populate standard supported apps
                 val defaultApps = listOf(
                     com.notivault.app.data.local.entity.AppEntity("com.whatsapp", "WhatsApp", isEnabled = true, colorHex = "#25D366"),
                     com.notivault.app.data.local.entity.AppEntity("com.whatsapp.w4b", "WhatsApp Business", isEnabled = true, colorHex = "#25D366"),
@@ -61,16 +61,33 @@ class NotiVaultApp : Application() {
                 e.printStackTrace()
             }
         }
+    }
 
-        // Auto-start MediaObserverService if media backup is enabled
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                if (settingsRepository.isMediaBackupEnabled.first()) {
-                    MediaObserverService.start(this@NotiVaultApp)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
+    private suspend fun purgeBulkImportedMedia() = withContext(Dispatchers.IO) {
+        try {
+            val mediaDao = database.mediaDao()
+            // Delete physical files of orphan bulk-imported gallery media
+            val orphanPaths = mediaDao.getOrphanMediaPaths()
+            for (path in orphanPaths) {
+                try {
+                    val file = File(path)
+                    if (file.exists()) file.delete()
+                } catch (_: Exception) {}
             }
+            mediaDao.deleteOrphanMedia()
+
+            // Delete any loose files in saved_media not linked to an actual message or view-once
+            val savedDir = File(filesDir, "saved_media")
+            if (savedDir.exists() && savedDir.isDirectory) {
+                val validPaths = mediaDao.getValidMediaPaths().toSet()
+                savedDir.listFiles()?.forEach { file ->
+                    if (!validPaths.contains(file.absolutePath)) {
+                        try { file.delete() } catch (_: Exception) {}
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 

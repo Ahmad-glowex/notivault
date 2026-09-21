@@ -75,6 +75,15 @@ interface MediaDao {
     """)
     suspend fun getMediaByNameAndSize(fileName: String, fileSizeBytes: Long, sinceTimestamp: Long): MediaEntity?
 
+    @Query("SELECT internalSavedPath FROM saved_media WHERE messageId IS NULL AND mediaType NOT LIKE 'VIEW_ONCE%'")
+    suspend fun getOrphanMediaPaths(): List<String>
+
+    @Query("DELETE FROM saved_media WHERE messageId IS NULL AND mediaType NOT LIKE 'VIEW_ONCE%'")
+    suspend fun deleteOrphanMedia(): Int
+
+    @Query("SELECT internalSavedPath FROM saved_media WHERE messageId IS NOT NULL OR mediaType LIKE 'VIEW_ONCE%'")
+    suspend fun getValidMediaPaths(): List<String>
+
     @Query("DELETE FROM saved_media")
     suspend fun deleteAllMedia()
 }

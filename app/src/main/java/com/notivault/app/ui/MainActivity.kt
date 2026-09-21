@@ -40,6 +40,10 @@ import com.notivault.app.ui.theme.TealSecondary
 import com.notivault.app.ui.theme.TextPrimaryDark
 import com.notivault.app.ui.theme.TextSecondaryDark
 
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+
 class MainActivity : FragmentActivity() {
 
     private lateinit var biometricAuthManager: BiometricAuthManager
@@ -50,6 +54,16 @@ class MainActivity : FragmentActivity() {
 
         val app = application as NotiVaultApp
         val settingsRepo = app.settingsRepository
+
+        lifecycleScope.launch {
+            try {
+                if (settingsRepo.isMediaBackupEnabled.first()) {
+                    com.notivault.app.service.media.MediaObserverService.start(this@MainActivity)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
 
         setContent {
             val isSecureWindow by settingsRepo.isSecureWindowEnabled.collectAsState(initial = false)
