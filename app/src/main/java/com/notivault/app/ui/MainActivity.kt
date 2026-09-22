@@ -68,6 +68,13 @@ class MainActivity : FragmentActivity() {
         setContent {
             val isSecureWindow by settingsRepo.isSecureWindowEnabled.collectAsState(initial = false)
             val isBiometricEnabled by settingsRepo.isBiometricLockEnabled.collectAsState(initial = false)
+            val themeMode by settingsRepo.themeMode.collectAsState(initial = "SYSTEM")
+            val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+            val isDarkTheme = when (themeMode) {
+                "DARK" -> true
+                "LIGHT" -> false
+                else -> systemDark
+            }
 
             var isUnlocked by remember { mutableStateOf(!settingsRepo.isAppLocked()) }
 
@@ -88,7 +95,7 @@ class MainActivity : FragmentActivity() {
                 }
             }
 
-            NotiVaultTheme {
+            NotiVaultTheme(darkTheme = isDarkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -126,7 +133,7 @@ fun LockedScreen(onUnlockClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkBackground),
+            .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -135,27 +142,27 @@ fun LockedScreen(onUnlockClick: () -> Unit) {
             Icon(
                 imageVector = Icons.Default.Fingerprint,
                 contentDescription = "Locked",
-                tint = TealSecondary,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(72.dp)
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "NotiVault is Locked",
                 style = MaterialTheme.typography.titleLarge,
-                color = TextPrimaryDark
+                color = MaterialTheme.colorScheme.onBackground
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "Authenticate to access private message logs",
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondaryDark
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(24.dp))
             Button(
                 onClick = onUnlockClick,
-                colors = ButtonDefaults.buttonColors(containerColor = TealSecondary)
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
-                Text(text = "Unlock Vault", color = Color.Black)
+                Text(text = "Unlock Vault", color = MaterialTheme.colorScheme.onPrimary)
             }
         }
     }

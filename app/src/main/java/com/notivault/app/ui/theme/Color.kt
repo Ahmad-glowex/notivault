@@ -23,3 +23,11 @@ val InstagramPink = Color(0xFFE1306C)
 val TelegramBlue = Color(0xFF229ED9)
 
 val CardBorder = Color(0xFF334155)
+
+// Light Theme Palette
+val LightBackground = Color(0xFFF8FAFC)
+val LightSurface = Color(0xFFFFFFFF)
+val LightSurfaceVariant = Color(0xFFF1F5F9)
+val TextPrimaryLight = Color(0xFF0F172A)
+val TextSecondaryLight = Color(0xFF64748B)
+val LightCardBorder = Color(0xFFE2E8F0)

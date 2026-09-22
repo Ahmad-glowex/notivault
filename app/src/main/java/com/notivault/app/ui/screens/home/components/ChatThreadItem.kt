@@ -1,6 +1,7 @@
 package com.notivault.app.ui.screens.home.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,13 +29,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.notivault.app.data.local.entity.ChatThreadEntity
-import com.notivault.app.ui.theme.DarkSurface
 import com.notivault.app.ui.theme.DeletedRed
 import com.notivault.app.ui.theme.InstagramPink
 import com.notivault.app.ui.theme.MessengerBlue
 import com.notivault.app.ui.theme.TelegramBlue
-import com.notivault.app.ui.theme.TextPrimaryDark
-import com.notivault.app.ui.theme.TextSecondaryDark
 import com.notivault.app.ui.theme.WhatsAppGreen
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -61,7 +59,8 @@ fun ChatThreadItem(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(DarkSurface)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -71,7 +70,7 @@ fun ChatThreadItem(
             modifier = Modifier
                 .size(48.dp)
                 .clip(CircleShape)
-                .background(appColor.copy(alpha = 0.2f)),
+                .background(appColor.copy(alpha = 0.18f)),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -94,7 +93,7 @@ fun ChatThreadItem(
                 Text(
                     text = thread.chatTitle,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = TextPrimaryDark,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -129,7 +128,7 @@ fun ChatThreadItem(
                 Text(
                     text = thread.lastMessageText.ifBlank { "No message preview" },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (isDeletedPreview) Color(0xFFFCA5A5) else TextSecondaryDark,
+                    color = if (isDeletedPreview) DeletedRed else MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = if (isDeletedPreview) FontWeight.Medium else FontWeight.Normal,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -146,7 +145,7 @@ fun ChatThreadItem(
             Text(
                 text = formattedTime,
                 style = MaterialTheme.typography.labelSmall,
-                color = TextSecondaryDark
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             if (thread.unreadCount > 0) {

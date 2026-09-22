@@ -76,12 +76,8 @@ import androidx.core.content.ContextCompat
 import com.notivault.app.service.media.MediaObserverService
 import com.notivault.app.ui.screens.home.components.ChatThreadItem
 import com.notivault.app.ui.screens.home.components.PermissionStatusBanner
-import com.notivault.app.ui.theme.DarkBackground
-import com.notivault.app.ui.theme.DarkSurface
 import com.notivault.app.ui.theme.DeletedRed
 import com.notivault.app.ui.theme.TealSecondary
-import com.notivault.app.ui.theme.TextPrimaryDark
-import com.notivault.app.ui.theme.TextSecondaryDark
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -175,13 +171,13 @@ fun HomeScreen(
                             Text(
                                 text = "NotiVault",
                                 style = MaterialTheme.typography.titleLarge,
-                                color = TextPrimaryDark,
+                                color = MaterialTheme.colorScheme.onBackground,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = "Private Notification & Media Backup",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = TextSecondaryDark
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -191,19 +187,19 @@ fun HomeScreen(
                         Icon(
                             imageVector = Icons.Default.Settings,
                             contentDescription = "Settings",
-                            tint = TextPrimaryDark
+                            tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DarkBackground
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
         },
         bottomBar = {
             NavigationBar(
-                containerColor = DarkSurface,
-                contentColor = TextPrimaryDark
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface
             ) {
                 NavigationBarItem(
                     selected = true,
@@ -211,11 +207,11 @@ fun HomeScreen(
                     icon = { Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Chats") },
                     label = { Text("Chats") },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color.Black,
-                        selectedTextColor = TealSecondary,
-                        indicatorColor = TealSecondary,
-                        unselectedIconColor = TextSecondaryDark,
-                        unselectedTextColor = TextSecondaryDark
+                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                        selectedTextColor = MaterialTheme.colorScheme.primary,
+                        indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 )
                 NavigationBarItem(
@@ -241,11 +237,11 @@ fun HomeScreen(
                     },
                     label = { Text("Deleted") },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color.Black,
-                        selectedTextColor = TealSecondary,
-                        indicatorColor = TealSecondary,
-                        unselectedIconColor = TextSecondaryDark,
-                        unselectedTextColor = TextSecondaryDark
+                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                        selectedTextColor = MaterialTheme.colorScheme.primary,
+                        indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 )
                 NavigationBarItem(
@@ -254,11 +250,11 @@ fun HomeScreen(
                     icon = { Icon(Icons.Default.Image, contentDescription = "Media Vault") },
                     label = { Text("Media") },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color.Black,
-                        selectedTextColor = TealSecondary,
-                        indicatorColor = TealSecondary,
-                        unselectedIconColor = TextSecondaryDark,
-                        unselectedTextColor = TextSecondaryDark
+                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                        selectedTextColor = MaterialTheme.colorScheme.primary,
+                        indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 )
                 NavigationBarItem(
@@ -267,16 +263,16 @@ fun HomeScreen(
                     icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
                     label = { Text("Settings") },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color.Black,
-                        selectedTextColor = TealSecondary,
-                        indicatorColor = TealSecondary,
-                        unselectedIconColor = TextSecondaryDark,
-                        unselectedTextColor = TextSecondaryDark
+                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                        selectedTextColor = MaterialTheme.colorScheme.primary,
+                        indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 )
             }
         },
-        containerColor = DarkBackground
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -360,7 +356,7 @@ fun HomeScreen(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(DarkSurface)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .clickable { onNavigateToDeleted() }
                         .padding(horizontal = 10.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -375,7 +371,7 @@ fun HomeScreen(
                     Text(
                         text = "$deletedCount Deleted",
                         style = MaterialTheme.typography.labelSmall,
-                        color = TextPrimaryDark,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -385,7 +381,7 @@ fun HomeScreen(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(DarkSurface)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .clickable { onNavigateToMedia() }
                         .padding(horizontal = 10.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -393,14 +389,14 @@ fun HomeScreen(
                     Icon(
                         imageVector = Icons.Default.Image,
                         contentDescription = null,
-                        tint = TealSecondary,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "$mediaCount Media",
                         style = MaterialTheme.typography.labelSmall,
-                        color = TextPrimaryDark,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -416,7 +412,7 @@ fun HomeScreen(
                 placeholder = {
                     Text(
                         text = "Search chats or messages...",
-                        color = TextSecondaryDark,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 },
@@ -424,7 +420,7 @@ fun HomeScreen(
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = "Search",
-                        tint = TextSecondaryDark
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 },
                 trailingIcon = {
@@ -433,19 +429,19 @@ fun HomeScreen(
                             Icon(
                                 imageVector = Icons.Default.Clear,
                                 contentDescription = "Clear",
-                                tint = TextSecondaryDark
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                 },
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = DarkSurface,
-                    unfocusedContainerColor = DarkSurface,
-                    focusedBorderColor = TealSecondary,
-                    unfocusedBorderColor = Color(0xFF334155),
-                    focusedTextColor = TextPrimaryDark,
-                    unfocusedTextColor = TextPrimaryDark
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                 ),
                 singleLine = true
             )
@@ -470,21 +466,21 @@ fun HomeScreen(
                         Icon(
                             imageVector = Icons.Default.NotificationsActive,
                             contentDescription = null,
-                            tint = TealSecondary.copy(alpha = 0.6f),
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
                             modifier = Modifier.size(64.dp)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = if (searchQuery.isNotBlank()) "No matching conversations" else "No Notifications Logged Yet",
                             style = MaterialTheme.typography.titleMedium,
-                            color = TextPrimaryDark,
+                            color = MaterialTheme.colorScheme.onBackground,
                             fontWeight = FontWeight.SemiBold
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = if (searchQuery.isNotBlank()) "Try a different search term" else "Incoming notifications from WhatsApp, Messenger, and Instagram will automatically appear here with deleted message preservation.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = TextSecondaryDark,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
                     }

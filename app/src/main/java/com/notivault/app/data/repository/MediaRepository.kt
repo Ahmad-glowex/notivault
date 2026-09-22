@@ -1,5 +1,6 @@
 package com.notivault.app.data.repository
 
+import android.content.Context
 import com.notivault.app.data.local.entity.MediaEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -25,4 +26,7 @@ interface MediaRepository {
     ): Long
     suspend fun deleteMedia(id: Long)
     suspend fun clearAllMedia()
+    fun getTotalMediaBytes(): Flow<Long>
+    suspend fun deleteMediaOlderThan(days: Int): Int
+    suspend fun purgeOrphanMediaFiles(context: Context): Long
 }

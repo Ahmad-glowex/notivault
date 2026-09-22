@@ -1,10 +1,12 @@
 package com.notivault.app.data.repository
 
+import android.content.Context
 import com.notivault.app.data.local.AppDatabase
 import com.notivault.app.data.local.entity.MediaEntity
 import com.notivault.app.service.media.MediaStoreObserver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -112,5 +114,48 @@ class MediaRepositoryImpl(
 
     override suspend fun clearAllMedia() = withContext(Dispatchers.IO) {
         mediaDao.deleteAllMedia()
+    }
+
+    override fun getTotalMediaBytes(): Flow<Long> =
+        mediaDao.getTotalMediaBytes().map { it ?: 0L }
+
+    override suspend fun deleteMediaOlderThan(days: Int): Int = withContext(Dispatchers.IO) {
+        if (days <= 0) return@withContext 0
+        val cutoff = System.currentTimeMillis() - (days.toLong() * 86_400_000L)
+        val oldMediaList = mediaDao.getMediaOlderThan(cutoff)
+        for (m in oldMediaList) {
+            try {
+                val file = File(m.internalSavedPath)
+                if (file.exists()) file.delete()
+            } catch (_: Exception) {}
+        }
+        mediaDao.deleteMediaOlderThan(cutoff)
+    }
+
+    override suspend fun purgeOrphanMediaFiles(context: Context): Long = withContext(Dispatchers.IO) {
+        var reclaimedBytes = 0L
+        val orphanPaths = mediaDao.getOrphanMediaPaths()
+        for (path in orphanPaths) {
+            try {
+                val file = File(path)
+                if (file.exists()) {
+                    val len = file.length()
+                    if (file.delete()) reclaimedBytes += len
+                }
+            } catch (_: Exception) {}
+        }
+        mediaDao.deleteOrphanMedia()
+
+        val savedDir = File(context.filesDir, "saved_media")
+        if (savedDir.exists() && savedDir.isDirectory) {
+            val validPaths = mediaDao.getValidMediaPaths().toSet()
+            savedDir.listFiles()?.forEach { file ->
+                if (!validPaths.contains(file.absolutePath)) {
+                    val len = file.length()
+                    if (file.delete()) reclaimedBytes += len
+                }
+            }
+        }
+        reclaimedBytes
     }
 }

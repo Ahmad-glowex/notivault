@@ -77,13 +77,4 @@ class MediaMagicDetectorTest {
         val result = MediaMagicDetector.detect(tempFile)
         assertNull(result)
     }
-
-    @Test
-    fun testRootAvailableCheckDoesNotCrash() {
-        // Must safely return a boolean (typically false on linux test runner without su) without hanging
-        val isRoot = RootViewOnceManager.isRootAvailable(forceCheck = true)
-        // Check caching works
-        val cached = RootViewOnceManager.isRootAvailable(forceCheck = false)
-        assertEquals(isRoot, cached)
-    }
 }

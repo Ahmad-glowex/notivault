@@ -33,33 +33,14 @@ class MediaObserverService : Service() {
     private val fileObservers = mutableListOf<MediaFileObserver>()
     private var mediaStoreObserver: MediaStoreObserver? = null
     private val pathsToWatch = mutableListOf<Pair<String, File>>()
-    private var activeSnifferJob: Job? = null
 
     companion object {
         const val CHANNEL_ID = "notivault_media_service_channel"
         const val NOTIFICATION_ID = 1001
-        const val ACTION_SNIFF_VIEW_ONCE = "com.notivault.app.ACTION_SNIFF_VIEW_ONCE"
-        const val EXTRA_TARGET_PACKAGE = "extra_target_package"
 
         fun start(context: Context) {
             try {
                 val intent = Intent(context, MediaObserverService::class.java)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(intent)
-                } else {
-                    context.startService(intent)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-
-        fun triggerViewOnceSniff(context: Context, targetPackage: String = "com.whatsapp") {
-            try {
-                val intent = Intent(context, MediaObserverService::class.java).apply {
-                    action = ACTION_SNIFF_VIEW_ONCE
-                    putExtra(EXTRA_TARGET_PACKAGE, targetPackage)
-                }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     context.startForegroundService(intent)
                 } else {
@@ -90,10 +71,6 @@ class MediaObserverService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForegroundSafely()
-        if (intent?.action == ACTION_SNIFF_VIEW_ONCE) {
-            val targetPkg = intent.getStringExtra(EXTRA_TARGET_PACKAGE) ?: "com.whatsapp"
-            startHighFrequencySniffer(targetPkg)
-        }
         return START_STICKY
     }
 
@@ -210,43 +187,6 @@ class MediaObserverService : Service() {
         }
     }
 
-    private fun startHighFrequencySniffer(targetPackage: String) {
-        activeSnifferJob?.cancel()
-        activeSnifferJob = serviceScope.launch {
-            val baseExternal = Environment.getExternalStorageDirectory()
-            val stagingDirs = listOf(
-                File(baseExternal, "Android/media/$targetPackage/WhatsApp/Media/.Shared"),
-                File(baseExternal, "Android/media/$targetPackage/WhatsApp/Media/.trash"),
-                File(baseExternal, "Android/media/$targetPackage/WhatsApp/Media/WhatsApp Images"),
-                File(baseExternal, "Android/media/$targetPackage/WhatsApp/Media/WhatsApp Images/Private"),
-                File(baseExternal, "Android/media/$targetPackage/WhatsApp/Media/WhatsApp Video"),
-                File(baseExternal, "Android/media/$targetPackage/WhatsApp/Media/WhatsApp Video/Private"),
-                File(baseExternal, "Android/media/$targetPackage/WhatsApp/Media")
-            )
-
-            // High-frequency polling loop: runs for 60 seconds (150 iterations @ 400ms)
-            var count = 0
-            val startTime = System.currentTimeMillis()
-            while (count < 150) {
-                for (dir in stagingDirs) {
-                    if (dir.exists() && dir.isDirectory) {
-                        val files = dir.listFiles() ?: continue
-                        for (file in files) {
-                            if (file.isFile && file.length() > 0 && !file.name.equals(".nomedia", ignoreCase = true)) {
-                                // Only process files created around or after sniffer start
-                                if (file.lastModified() >= (startTime - 60_000L)) {
-                                    handleNewMediaFile(file, targetPackage)
-                                }
-                            }
-                        }
-                    }
-                }
-                delay(400)
-                count++
-            }
-        }
-    }
-
     private fun handleNewMediaFile(file: File, packageName: String) {
         serviceScope.launch {
             val app = application as? NotiVaultApp ?: return@launch
@@ -280,16 +220,8 @@ class MediaObserverService : Service() {
                 msgDao.getLatestPendingMediaMessage(packageName, sinceTimestamp = now - pendingWindow)
             }
 
-            val isStagingDir = file.absolutePath.contains(".Shared") || file.absolutePath.contains(".trash")
-            val isViewOnceMsg = targetMsg?.messageText?.let {
-                it.contains("①") || it.contains("\u2460") || it.contains("view once", ignoreCase = true) || it.contains("একবার দেখার")
-            } ?: false
-
-            val isViewOnce = isViewOnceMsg || (isStagingDir && activeSnifferJob?.isActive == true)
-
-            // CRITICAL PROTECTION: If there is no pending message from a chat AND it's not an active view-once staging file,
-            // DO NOT COPY! Prevents cloning the user's gallery or personal files.
-            if (targetMsg == null && !isViewOnce) {
+            // CRITICAL PROTECTION: Only copy media if there is an active incoming message waiting for it!
+            if (targetMsg == null) {
                 return@launch
             }
 
@@ -306,18 +238,7 @@ class MediaObserverService : Service() {
 
             val cachedFile = cacheManager.cacheLocalFile(file, prefix = packageName.replace(".", "_"))
             if (cachedFile != null) {
-                val finalMediaType = if (isViewOnce) {
-                    if (detected.mediaType == "VIDEO") "VIEW_ONCE_VIDEO" else "VIEW_ONCE_IMAGE"
-                } else {
-                    detected.mediaType
-                }
-
-                val threadId = targetMsg?.threadId ?: "${packageName}_view_once"
-                val messageId = targetMsg?.id
-
-                if (targetMsg != null) {
-                    msgDao.updateMessageMedia(targetMsg.id, cachedFile.absolutePath, detected.mimeType)
-                }
+                msgDao.updateMessageMedia(targetMsg.id, cachedFile.absolutePath, detected.mimeType)
 
                 app.mediaRepository.saveCachedMedia(
                     packageName = packageName,
@@ -326,9 +247,9 @@ class MediaObserverService : Service() {
                     fileName = cachedFile.name,
                     mimeType = detected.mimeType,
                     fileSizeBytes = cachedFile.length(),
-                    mediaType = finalMediaType,
-                    threadId = threadId,
-                    messageId = messageId
+                    mediaType = detected.mediaType,
+                    threadId = targetMsg.threadId,
+                    messageId = targetMsg.id
                 )
             }
         }
@@ -367,30 +288,16 @@ class MediaObserverService : Service() {
                 msgDao.getLatestPendingMediaMessage(packageName, sinceTimestamp = now - pendingWindow)
             }
 
-            val isViewOnce = targetMsg?.messageText?.let {
-                it.contains("①") || it.contains("\u2460") || it.contains("view once", ignoreCase = true) || it.contains("একবার দেখার")
-            } ?: false
-
             // CRITICAL PROTECTION: Never copy media unless there is an active incoming message waiting for it!
-            if (targetMsg == null && !isViewOnce) {
+            if (targetMsg == null) {
                 return@launch
             }
 
             val cachedFile = cacheManager.cacheContentUri(uri, mime, prefix = packageName.replace(".", "_"))
             if (cachedFile != null) {
                 val resolvedMime = if (mediaType == "VIDEO" && !mime.startsWith("video")) "video/mp4" else mime
-                val finalMediaType = if (isViewOnce) {
-                    if (mediaType == "VIDEO") "VIEW_ONCE_VIDEO" else "VIEW_ONCE_IMAGE"
-                } else {
-                    mediaType
-                }
 
-                val threadId = targetMsg?.threadId ?: "${packageName}_media"
-                val messageId = targetMsg?.id
-
-                if (targetMsg != null) {
-                    msgDao.updateMessageMedia(targetMsg.id, cachedFile.absolutePath, resolvedMime)
-                }
+                msgDao.updateMessageMedia(targetMsg.id, cachedFile.absolutePath, resolvedMime)
 
                 app.mediaRepository.saveCachedMedia(
                     packageName = packageName,
@@ -399,9 +306,9 @@ class MediaObserverService : Service() {
                     fileName = cachedFile.name,
                     mimeType = resolvedMime,
                     fileSizeBytes = cachedFile.length(),
-                    mediaType = finalMediaType,
-                    threadId = threadId,
-                    messageId = messageId
+                    mediaType = mediaType,
+                    threadId = targetMsg.threadId,
+                    messageId = targetMsg.id
                 )
             }
         }

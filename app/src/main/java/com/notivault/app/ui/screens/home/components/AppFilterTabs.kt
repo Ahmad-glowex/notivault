@@ -11,10 +11,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.notivault.app.ui.theme.DarkSurface
-import com.notivault.app.ui.theme.TealSecondary
 
 enum class AppTab(val label: String, val packageName: String?) {
     ALL("All", null),
@@ -50,10 +47,10 @@ fun AppFilterTabs(
                     )
                 },
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = TealSecondary,
-                    selectedLabelColor = Color.Black,
-                    containerColor = DarkSurface,
-                    labelColor = Color.White
+                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    labelColor = MaterialTheme.colorScheme.onSurface
                 )
             )
         }

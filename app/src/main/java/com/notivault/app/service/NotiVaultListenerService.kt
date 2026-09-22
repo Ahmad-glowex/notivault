@@ -1,18 +1,25 @@
 package com.notivault.app.service
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import com.notivault.app.NotiVaultApp
+import com.notivault.app.R
 import com.notivault.app.data.local.entity.AppEntity
 import com.notivault.app.service.parser.NotificationParser
 import com.notivault.app.service.media.MediaCacheManager
-import com.notivault.app.service.media.MediaObserverService
-import com.notivault.app.service.media.RootViewOnceManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class NotiVaultListenerService : NotificationListenerService() {
@@ -51,6 +58,13 @@ class NotiVaultListenerService : NotificationListenerService() {
 
         serviceScope.launch {
             try {
+                // Check if notification interception is globally enabled
+                val isInterceptionEnabled = app.settingsRepository.isInterceptionEnabled.first()
+                if (!isInterceptionEnabled) {
+                    Log.d(TAG, "Notification interception is paused in settings, skipping notification")
+                    return@launch
+                }
+
                 // Ensure the app entity exists in DB
                 ensureAppRegistered(app, packageName)
 
@@ -59,6 +73,9 @@ class NotiVaultListenerService : NotificationListenerService() {
                     Log.d(TAG, "Monitoring is disabled for $packageName, skipping notification")
                     return@launch
                 }
+
+                val isMediaBackupEnabled = app.settingsRepository.isMediaBackupEnabled.first()
+                val isDeletedAlertEnabled = app.settingsRepository.isDeletedAlertEnabled.first()
 
                 val parsedItems = NotificationParser.parse(sbn)
                 for (item in parsedItems) {
@@ -71,77 +88,83 @@ class NotiVaultListenerService : NotificationListenerService() {
                             timestamp = item.timestamp
                         )
                         Log.d(TAG, "Marked previous message as deleted: $marked")
+
+                        if (marked && isDeletedAlertEnabled) {
+                            postDeletedAlertNotification(item.chatTitle, item.senderName, item.packageName)
+                        }
                     } else {
                         var savedMediaUri: String? = null
                         var hasMedia = item.hasMedia
 
-                        try {
-                            if (item.mediaBitmap != null) {
-                                val cachedFile = cacheManager.cacheBitmap(
-                                    item.mediaBitmap,
-                                    prefix = item.packageName.replace(".", "_")
-                                )
-                                if (cachedFile != null) {
-                                    savedMediaUri = cachedFile.absolutePath
-                                    hasMedia = true
-                                    app.mediaRepository.saveCachedMedia(
-                                        packageName = item.packageName,
-                                        originalPath = "notification_${item.notificationKey}_${item.timestamp}",
-                                        internalSavedPath = cachedFile.absolutePath,
-                                        fileName = cachedFile.name,
-                                        mimeType = "image/jpeg",
-                                        fileSizeBytes = cachedFile.length(),
-                                        mediaType = "IMAGE",
-                                        threadId = "${item.packageName}_${item.chatTitle.trim()}"
+                        if (isMediaBackupEnabled) {
+                            try {
+                                if (item.mediaBitmap != null) {
+                                    val cachedFile = cacheManager.cacheBitmap(
+                                        item.mediaBitmap,
+                                        prefix = item.packageName.replace(".", "_")
                                     )
-                                }
-                            } else if (item.mediaIcon != null) {
-                                val cachedFile = cacheManager.cacheIcon(
-                                    item.mediaIcon,
-                                    prefix = item.packageName.replace(".", "_")
-                                )
-                                if (cachedFile != null) {
-                                    savedMediaUri = cachedFile.absolutePath
-                                    hasMedia = true
-                                    app.mediaRepository.saveCachedMedia(
-                                        packageName = item.packageName,
-                                        originalPath = "notification_${item.notificationKey}_${item.timestamp}",
-                                        internalSavedPath = cachedFile.absolutePath,
-                                        fileName = cachedFile.name,
-                                        mimeType = "image/jpeg",
-                                        fileSizeBytes = cachedFile.length(),
-                                        mediaType = "IMAGE",
-                                        threadId = "${item.packageName}_${item.chatTitle.trim()}"
-                                    )
-                                }
-                            } else if (item.mediaDataUri != null) {
-                                val cachedFile = cacheManager.cacheContentUri(
-                                    item.mediaDataUri,
-                                    item.mediaType,
-                                    prefix = item.packageName.replace(".", "_")
-                                )
-                                if (cachedFile != null) {
-                                    savedMediaUri = cachedFile.absolutePath
-                                    hasMedia = true
-                                    val mType = when {
-                                        item.mediaType?.startsWith("video") == true -> "VIDEO"
-                                        item.mediaType?.startsWith("audio") == true -> "AUDIO"
-                                        else -> "IMAGE"
+                                    if (cachedFile != null) {
+                                        savedMediaUri = cachedFile.absolutePath
+                                        hasMedia = true
+                                        app.mediaRepository.saveCachedMedia(
+                                            packageName = item.packageName,
+                                            originalPath = "notification_${item.notificationKey}_${item.timestamp}",
+                                            internalSavedPath = cachedFile.absolutePath,
+                                            fileName = cachedFile.name,
+                                            mimeType = "image/jpeg",
+                                            fileSizeBytes = cachedFile.length(),
+                                            mediaType = "IMAGE",
+                                            threadId = "${item.packageName}_${item.chatTitle.trim()}"
+                                        )
                                     }
-                                    app.mediaRepository.saveCachedMedia(
-                                        packageName = item.packageName,
-                                        originalPath = item.mediaDataUri.toString(),
-                                        internalSavedPath = cachedFile.absolutePath,
-                                        fileName = cachedFile.name,
-                                        mimeType = item.mediaType ?: "image/jpeg",
-                                        fileSizeBytes = cachedFile.length(),
-                                        mediaType = mType,
-                                        threadId = "${item.packageName}_${item.chatTitle.trim()}"
+                                } else if (item.mediaIcon != null) {
+                                    val cachedFile = cacheManager.cacheIcon(
+                                        item.mediaIcon,
+                                        prefix = item.packageName.replace(".", "_")
                                     )
+                                    if (cachedFile != null) {
+                                        savedMediaUri = cachedFile.absolutePath
+                                        hasMedia = true
+                                        app.mediaRepository.saveCachedMedia(
+                                            packageName = item.packageName,
+                                            originalPath = "notification_${item.notificationKey}_${item.timestamp}",
+                                            internalSavedPath = cachedFile.absolutePath,
+                                            fileName = cachedFile.name,
+                                            mimeType = "image/jpeg",
+                                            fileSizeBytes = cachedFile.length(),
+                                            mediaType = "IMAGE",
+                                            threadId = "${item.packageName}_${item.chatTitle.trim()}"
+                                        )
+                                    }
+                                } else if (item.mediaDataUri != null) {
+                                    val cachedFile = cacheManager.cacheContentUri(
+                                        item.mediaDataUri,
+                                        item.mediaType,
+                                        prefix = item.packageName.replace(".", "_")
+                                    )
+                                    if (cachedFile != null) {
+                                        savedMediaUri = cachedFile.absolutePath
+                                        hasMedia = true
+                                        val mType = when {
+                                            item.mediaType?.startsWith("video") == true -> "VIDEO"
+                                            item.mediaType?.startsWith("audio") == true -> "AUDIO"
+                                            else -> "IMAGE"
+                                        }
+                                        app.mediaRepository.saveCachedMedia(
+                                            packageName = item.packageName,
+                                            originalPath = item.mediaDataUri.toString(),
+                                            internalSavedPath = cachedFile.absolutePath,
+                                            fileName = cachedFile.name,
+                                            mimeType = item.mediaType ?: "image/jpeg",
+                                            fileSizeBytes = cachedFile.length(),
+                                            mediaType = mType,
+                                            threadId = "${item.packageName}_${item.chatTitle.trim()}"
+                                        )
+                                    }
                                 }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error caching media payload from notification", e)
                             }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error caching media payload from notification", e)
                         }
 
                         app.messageRepository.saveIncomingNotification(
@@ -156,21 +179,6 @@ class NotiVaultListenerService : NotificationListenerService() {
                             mediaUri = savedMediaUri,
                             mediaMimeType = item.mediaType
                         )
-
-                        if (hasMedia || NotificationParser.isVideoIndicatingText(item.messageText) || NotificationParser.isMediaIndicatingText(item.messageText)) {
-                            try {
-                                val isViewOnce = item.messageText.contains("①") ||
-                                        item.messageText.contains("\u2460") ||
-                                        item.messageText.contains("view once", ignoreCase = true) ||
-                                        item.messageText.contains("একবার দেখার")
-                                if (isViewOnce) {
-                                    RootViewOnceManager.triggerCapture(this@NotiVaultListenerService, item.packageName, serviceScope)
-                                    MediaObserverService.triggerViewOnceSniff(this@NotiVaultListenerService, item.packageName)
-                                }
-                            } catch (e: Exception) {
-                                Log.e(TAG, "Failed to trigger view-once sniffer", e)
-                            }
-                        }
                     }
                 }
             } catch (e: Exception) {
@@ -205,6 +213,59 @@ class NotiVaultListenerService : NotificationListenerService() {
                     colorHex = colorHex
                 )
             )
+        }
+    }
+
+    private fun postDeletedAlertNotification(chatTitle: String, senderName: String, packageName: String) {
+        try {
+            val channelId = "notivault_deleted_alerts"
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(
+                    channelId,
+                    "Deleted Message Alerts",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Alerts you when a message is deleted or recalled by sender"
+                    enableLights(true)
+                    enableVibration(true)
+                }
+                notificationManager.createNotificationChannel(channel)
+            }
+
+            val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+                ?: Intent(this, com.notivault.app.ui.MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                }
+            val pendingIntent = PendingIntent.getActivity(
+                this,
+                (System.currentTimeMillis() % 100000).toInt(),
+                launchIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val appName = try {
+                packageManager.getApplicationLabel(packageManager.getApplicationInfo(packageName, 0)).toString()
+            } catch (_: Exception) {
+                packageName
+            }
+
+            val alertNotification = NotificationCompat.Builder(this, channelId)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle("Deleted Message Preserved ($appName)")
+                .setContentText("$senderName deleted a message in $chatTitle")
+                .setStyle(
+                    NotificationCompat.BigTextStyle()
+                        .bigText("$senderName deleted a message in $chatTitle.\nNotiVault has safely preserved the original content in your vault.")
+                )
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .build()
+
+            notificationManager.notify((System.currentTimeMillis() % 100000).toInt() + 2000, alertNotification)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to post deleted message alert notification", e)
         }
     }
 

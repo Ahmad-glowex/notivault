@@ -41,11 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.notivault.app.ui.screens.media.components.MediaGridItem
 import com.notivault.app.ui.screens.media.components.MediaViewerModal
-import com.notivault.app.ui.theme.DarkBackground
-import com.notivault.app.ui.theme.DarkSurface
-import com.notivault.app.ui.theme.TealSecondary
-import com.notivault.app.ui.theme.TextPrimaryDark
-import com.notivault.app.ui.theme.TextSecondaryDark
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,13 +61,13 @@ fun MediaGalleryScreen(
                         Text(
                             text = "Saved Media Vault",
                             style = MaterialTheme.typography.titleMedium,
-                            color = TextPrimaryDark,
+                            color = MaterialTheme.colorScheme.onBackground,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = "${mediaList.size} cached attachments",
                             style = MaterialTheme.typography.labelSmall,
-                            color = TextSecondaryDark
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 },
@@ -80,7 +76,7 @@ fun MediaGalleryScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = TextPrimaryDark
+                            tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
                 },
@@ -90,15 +86,15 @@ fun MediaGalleryScreen(
                             Icon(
                                 imageVector = Icons.Default.DeleteSweep,
                                 contentDescription = "Clear Media",
-                                tint = TextSecondaryDark
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkBackground)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         },
-        containerColor = DarkBackground
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -108,7 +104,6 @@ fun MediaGalleryScreen(
             // Filter categories
             val filters = listOf(
                 Pair("ALL", "All Media"),
-                Pair("VIEW_ONCE", "View-Once"),
                 Pair("IMAGE", "Photos"),
                 Pair("VIDEO", "Videos"),
                 Pair("AUDIO", "Audio / Voice")
@@ -128,10 +123,10 @@ fun MediaGalleryScreen(
                         onClick = { viewModel.selectFilter(type) },
                         label = { Text(label) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = TealSecondary,
-                            selectedLabelColor = Color.Black,
-                            containerColor = DarkSurface,
-                            labelColor = Color.White
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
                 }
@@ -150,21 +145,21 @@ fun MediaGalleryScreen(
                         Icon(
                             imageVector = Icons.Default.PermMedia,
                             contentDescription = null,
-                            tint = TealSecondary.copy(alpha = 0.5f),
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
                             modifier = Modifier.size(64.dp)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = "No Cached Media",
                             style = MaterialTheme.typography.titleMedium,
-                            color = TextPrimaryDark,
+                            color = MaterialTheme.colorScheme.onBackground,
                             fontWeight = FontWeight.SemiBold
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = "When media attachments are downloaded by WhatsApp, Telegram, or Messenger, NotiVault's Media Observer caches a copy here before they can be revoked.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = TextSecondaryDark,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
                     }

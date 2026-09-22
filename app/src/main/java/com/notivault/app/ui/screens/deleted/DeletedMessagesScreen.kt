@@ -55,15 +55,8 @@ import com.notivault.app.data.local.entity.MediaEntity
 import com.notivault.app.data.local.entity.MessageEntity
 import com.notivault.app.ui.screens.chat.components.DeletedBadge
 import com.notivault.app.ui.screens.media.components.MediaViewerModal
-import com.notivault.app.ui.theme.DarkBackground
-import com.notivault.app.ui.theme.DarkSurface
-import com.notivault.app.ui.theme.DarkSurfaceVariant
-import com.notivault.app.ui.theme.DeletedBadgeBorder
 import com.notivault.app.ui.theme.DeletedRed
-import com.notivault.app.ui.theme.DeletedRedBg
 import com.notivault.app.ui.theme.TealSecondary
-import com.notivault.app.ui.theme.TextPrimaryDark
-import com.notivault.app.ui.theme.TextSecondaryDark
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -87,13 +80,13 @@ fun DeletedMessagesScreen(
                         Text(
                             text = "Preserved Deleted Messages",
                             style = MaterialTheme.typography.titleMedium,
-                            color = TextPrimaryDark,
+                            color = MaterialTheme.colorScheme.onBackground,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = "${deletedMessages.size} unsent messages recovered",
                             style = MaterialTheme.typography.labelSmall,
-                            color = TextSecondaryDark
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 },
@@ -102,7 +95,7 @@ fun DeletedMessagesScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = TextPrimaryDark
+                            tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
                 },
@@ -112,15 +105,15 @@ fun DeletedMessagesScreen(
                             Icon(
                                 imageVector = Icons.Default.DeleteSweep,
                                 contentDescription = "Clear All",
-                                tint = TextSecondaryDark
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkBackground)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         },
-        containerColor = DarkBackground
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         if (deletedMessages.isEmpty()) {
             Box(
@@ -135,7 +128,7 @@ fun DeletedMessagesScreen(
                         modifier = Modifier
                             .size(72.dp)
                             .clip(CircleShape)
-                            .background(DarkSurface),
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -149,14 +142,14 @@ fun DeletedMessagesScreen(
                     Text(
                         text = "No deleted messages captured yet",
                         style = MaterialTheme.typography.titleSmall,
-                        color = TextPrimaryDark,
+                        color = MaterialTheme.colorScheme.onBackground,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "When a sender sends and then deletes or unsends a message, NotiVault will preserve the original text and media here!",
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondaryDark,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                 }
@@ -236,7 +229,7 @@ private fun DeletedMessageCard(
             .fillMaxWidth()
             .clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = androidx.compose.foundation.BorderStroke(1.dp, DeletedRed.copy(alpha = 0.4f))
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
@@ -262,14 +255,14 @@ private fun DeletedMessageCard(
                 Text(
                     text = cleanChatName,
                     style = MaterialTheme.typography.titleSmall,
-                    color = TextPrimaryDark,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
                 )
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Chat,
                     contentDescription = "Go to chat",
-                    tint = TextSecondaryDark,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(16.dp)
                 )
             }
@@ -307,7 +300,7 @@ private fun DeletedMessageCard(
             Text(
                 text = message.messageText,
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextPrimaryDark,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Medium
             )
 
@@ -317,7 +310,7 @@ private fun DeletedMessageCard(
             Text(
                 text = "Sent at $origTimeFormatted",
                 style = MaterialTheme.typography.labelSmall,
-                color = TextSecondaryDark
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

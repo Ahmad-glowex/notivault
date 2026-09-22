@@ -28,6 +28,7 @@ private val DarkColorScheme = darkColorScheme(
     onBackground = TextPrimaryDark,
     onSurface = TextPrimaryDark,
     onSurfaceVariant = TextSecondaryDark,
+    outline = CardBorder,
     error = DeletedRed
 )
 
@@ -35,18 +36,22 @@ private val LightColorScheme = lightColorScheme(
     primary = TealPrimary,
     secondary = TealSecondary,
     tertiary = MessengerBlue,
-    background = DarkBackground,
-    surface = DarkSurface,
-    onPrimary = TextPrimaryDark,
-    onSecondary = DarkBackground,
-    onTertiary = TextPrimaryDark,
-    onBackground = TextPrimaryDark,
-    onSurface = TextPrimaryDark
+    background = LightBackground,
+    surface = LightSurface,
+    surfaceVariant = LightSurfaceVariant,
+    onPrimary = androidx.compose.ui.graphics.Color.White,
+    onSecondary = androidx.compose.ui.graphics.Color.White,
+    onTertiary = androidx.compose.ui.graphics.Color.White,
+    onBackground = TextPrimaryLight,
+    onSurface = TextPrimaryLight,
+    onSurfaceVariant = TextSecondaryLight,
+    outline = LightCardBorder,
+    error = DeletedRed
 )
 
 @Composable
 fun NotiVaultTheme(
-    darkTheme: Boolean = true, // Default to sleek dark privacy theme
+    darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {

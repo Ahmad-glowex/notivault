@@ -86,4 +86,13 @@ interface MediaDao {
 
     @Query("DELETE FROM saved_media")
     suspend fun deleteAllMedia()
+
+    @Query("SELECT SUM(fileSizeBytes) FROM saved_media")
+    fun getTotalMediaBytes(): Flow<Long?>
+
+    @Query("SELECT * FROM saved_media WHERE timestamp < :cutoff")
+    suspend fun getMediaOlderThan(cutoff: Long): List<MediaEntity>
+
+    @Query("DELETE FROM saved_media WHERE timestamp < :cutoff")
+    suspend fun deleteMediaOlderThan(cutoff: Long): Int
 }

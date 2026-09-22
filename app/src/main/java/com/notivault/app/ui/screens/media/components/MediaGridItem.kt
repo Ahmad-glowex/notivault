@@ -26,8 +26,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.notivault.app.data.local.entity.MediaEntity
-import com.notivault.app.ui.theme.DarkSurfaceVariant
 import java.io.File
+
 
 @Composable
 fun MediaGridItem(
@@ -41,7 +41,7 @@ fun MediaGridItem(
         modifier = modifier
             .aspectRatio(1f)
             .clip(RoundedCornerShape(8.dp))
-            .background(DarkSurfaceVariant)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable(onClick = onClick)
     ) {
         if (media.mediaType == "IMAGE" || media.mediaType == "VIDEO") {

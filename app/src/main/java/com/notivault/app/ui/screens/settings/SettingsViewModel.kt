@@ -26,6 +26,27 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _exportIntent = MutableStateFlow<Intent?>(null)
     val exportIntent: StateFlow<Intent?> = _exportIntent.asStateFlow()
 
+    val isInterceptionEnabled: StateFlow<Boolean> = settingsRepo.isInterceptionEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    val themeMode: StateFlow<String> = settingsRepo.themeMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "SYSTEM")
+
+    val isDeletedAlertEnabled: StateFlow<Boolean> = settingsRepo.isDeletedAlertEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    val autoCleanupDays: StateFlow<Int> = settingsRepo.autoCleanupDays
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val totalMediaBytes: StateFlow<Long> = app.mediaRepository.getTotalMediaBytes()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    val totalMessageCount: StateFlow<Int> = messageRepo.getMessageCount()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val totalMediaCount: StateFlow<Int> = app.mediaRepository.getMediaCount()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
     val isBiometricLockEnabled: StateFlow<Boolean> = settingsRepo.isBiometricLockEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
@@ -37,6 +58,34 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     val monitoredApps: StateFlow<List<AppEntity>> = messageRepo.getMonitoredApps()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun setInterception(enabled: Boolean) {
+        settingsRepo.setInterceptionEnabled(enabled)
+    }
+
+    fun setThemeMode(mode: String) {
+        settingsRepo.setThemeMode(mode)
+    }
+
+    fun setDeletedAlert(enabled: Boolean) {
+        settingsRepo.setDeletedAlertEnabled(enabled)
+    }
+
+    fun setAutoCleanup(days: Int) {
+        settingsRepo.setAutoCleanupDays(days)
+        if (days > 0) {
+            viewModelScope.launch {
+                messageRepo.deleteMessagesOlderThan(days)
+                app.mediaRepository.deleteMediaOlderThan(days)
+            }
+        }
+    }
+
+    fun purgeCache(context: Context) {
+        viewModelScope.launch {
+            app.mediaRepository.purgeOrphanMediaFiles(context)
+        }
+    }
 
     fun setBiometricLock(enabled: Boolean) {
         settingsRepo.setBiometricLockEnabled(enabled)

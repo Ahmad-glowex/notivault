@@ -11,11 +11,17 @@ interface SettingsRepository {
     val isMediaBackupEnabled: Flow<Boolean>
     val isSecureWindowEnabled: Flow<Boolean>
     val isInterceptionEnabled: Flow<Boolean>
+    val themeMode: Flow<String>
+    val isDeletedAlertEnabled: Flow<Boolean>
+    val autoCleanupDays: Flow<Int>
 
     fun setBiometricLockEnabled(enabled: Boolean)
     fun setMediaBackupEnabled(enabled: Boolean)
     fun setSecureWindowEnabled(enabled: Boolean)
     fun setInterceptionEnabled(enabled: Boolean)
+    fun setThemeMode(mode: String)
+    fun setDeletedAlertEnabled(enabled: Boolean)
+    fun setAutoCleanupDays(days: Int)
     fun isAppLocked(): Boolean
 }
 
@@ -31,12 +37,18 @@ class SettingsRepositoryImpl(
         private const val KEY_MEDIA_BACKUP = "key_media_backup"
         private const val KEY_SECURE_WINDOW = "key_secure_window"
         private const val KEY_INTERCEPTION = "key_interception"
+        private const val KEY_THEME_MODE = "key_theme_mode"
+        private const val KEY_DELETED_ALERT = "key_deleted_alert"
+        private const val KEY_AUTO_CLEANUP = "key_auto_cleanup"
     }
 
     override val isBiometricLockEnabled: Flow<Boolean> = preferenceFlow(KEY_BIOMETRIC_LOCK, false)
     override val isMediaBackupEnabled: Flow<Boolean> = preferenceFlow(KEY_MEDIA_BACKUP, true)
     override val isSecureWindowEnabled: Flow<Boolean> = preferenceFlow(KEY_SECURE_WINDOW, false)
     override val isInterceptionEnabled: Flow<Boolean> = preferenceFlow(KEY_INTERCEPTION, true)
+    override val themeMode: Flow<String> = stringPreferenceFlow(KEY_THEME_MODE, "SYSTEM")
+    override val isDeletedAlertEnabled: Flow<Boolean> = preferenceFlow(KEY_DELETED_ALERT, true)
+    override val autoCleanupDays: Flow<Int> = intPreferenceFlow(KEY_AUTO_CLEANUP, 0)
 
     override fun setBiometricLockEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_BIOMETRIC_LOCK, enabled).apply()
@@ -54,8 +66,46 @@ class SettingsRepositoryImpl(
         prefs.edit().putBoolean(KEY_INTERCEPTION, enabled).apply()
     }
 
+    override fun setThemeMode(mode: String) {
+        prefs.edit().putString(KEY_THEME_MODE, mode).apply()
+    }
+
+    override fun setDeletedAlertEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_DELETED_ALERT, enabled).apply()
+    }
+
+    override fun setAutoCleanupDays(days: Int) {
+        prefs.edit().putInt(KEY_AUTO_CLEANUP, days).apply()
+    }
+
     override fun isAppLocked(): Boolean {
         return prefs.getBoolean(KEY_BIOMETRIC_LOCK, false)
+    }
+
+    private fun stringPreferenceFlow(key: String, defaultValue: String): Flow<String> = callbackFlow {
+        trySend(prefs.getString(key, defaultValue) ?: defaultValue)
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, changedKey ->
+            if (changedKey == key) {
+                trySend(prefs.getString(key, defaultValue) ?: defaultValue)
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose {
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }
+
+    private fun intPreferenceFlow(key: String, defaultValue: Int): Flow<Int> = callbackFlow {
+        trySend(prefs.getInt(key, defaultValue))
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, changedKey ->
+            if (changedKey == key) {
+                trySend(prefs.getInt(key, defaultValue))
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose {
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
     }
 
     private fun preferenceFlow(key: String, defaultValue: Boolean): Flow<Boolean> = callbackFlow {

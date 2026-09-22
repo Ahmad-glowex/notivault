@@ -206,4 +206,10 @@ interface MessageDao {
         )
     """)
     suspend fun deleteDuplicateMessages()
+
+    @Query("SELECT COUNT(*) FROM messages")
+    fun getMessageCount(): Flow<Int>
+
+    @Query("DELETE FROM messages WHERE timestamp < :cutoff")
+    suspend fun deleteMessagesOlderThan(cutoff: Long): Int
 }

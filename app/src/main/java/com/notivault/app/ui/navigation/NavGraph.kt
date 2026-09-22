@@ -16,7 +16,6 @@ import com.notivault.app.ui.screens.deleted.DeletedMessagesScreen
 import com.notivault.app.ui.screens.home.HomeScreen
 import com.notivault.app.ui.screens.media.MediaGalleryScreen
 import com.notivault.app.ui.screens.settings.SettingsScreen
-import com.notivault.app.ui.screens.viewonce.ViewOnceCompanionScreen
 
 @Composable
 fun NotiVaultNavGraph(
@@ -89,15 +88,7 @@ fun NotiVaultNavGraph(
 
         composable(Screen.Settings.route) {
             SettingsScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToViewOnce = { navController.navigate(Screen.ViewOnceCompanion.route) }
-            )
-        }
-
-        composable(Screen.ViewOnceCompanion.route) {
-            ViewOnceCompanionScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToGallery = { navController.navigate(Screen.MediaGallery.route) }
+                onNavigateBack = { navController.popBackStack() }
             )
         }
     }

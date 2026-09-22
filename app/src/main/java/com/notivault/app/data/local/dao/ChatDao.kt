@@ -47,4 +47,7 @@ interface ChatDao {
 
     @Query("DELETE FROM chat_threads")
     suspend fun deleteAllThreads()
+
+    @Query("DELETE FROM chat_threads WHERE threadId NOT IN (SELECT DISTINCT threadId FROM messages)")
+    suspend fun deleteEmptyThreads(): Int
 }

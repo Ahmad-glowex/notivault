@@ -39,11 +39,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.notivault.app.data.local.entity.MediaEntity
-import com.notivault.app.ui.theme.DarkBackground
 import com.notivault.app.ui.theme.DeletedRed
-import com.notivault.app.ui.theme.TealSecondary
-import com.notivault.app.ui.theme.TextPrimaryDark
-import com.notivault.app.ui.theme.TextSecondaryDark
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -66,7 +62,7 @@ fun MediaViewerModal(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(DarkBackground)
+                .background(MaterialTheme.colorScheme.background)
         ) {
             Column(
                 modifier = Modifier.fillMaxSize()
@@ -83,7 +79,7 @@ fun MediaViewerModal(
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Close",
-                            tint = TextPrimaryDark
+                            tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
 
@@ -96,7 +92,7 @@ fun MediaViewerModal(
                             Icon(
                                 imageVector = Icons.Default.Share,
                                 contentDescription = "Share",
-                                tint = TealSecondary
+                                tint = MaterialTheme.colorScheme.primary
                             )
                         }
 
@@ -137,22 +133,22 @@ fun MediaViewerModal(
                             Icon(
                                 imageVector = Icons.Default.Videocam,
                                 contentDescription = "Video",
-                                tint = TealSecondary,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(72.dp)
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
                                 text = media.fileName,
                                 style = MaterialTheme.typography.titleMedium,
-                                color = TextPrimaryDark
+                                color = MaterialTheme.colorScheme.onBackground
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Button(
                                 onClick = { openExternal(context, file, media.mimeType) },
-                                colors = ButtonDefaults.buttonColors(containerColor = TealSecondary),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
-                                Text("Play Video / Open Externally", color = Color.Black, fontWeight = FontWeight.Bold)
+                                Text("Play Video / Open Externally", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -167,13 +163,13 @@ fun MediaViewerModal(
                     Text(
                         text = media.fileName,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = TextPrimaryDark
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Captured: $formattedDate • App: ${media.packageName}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondaryDark
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

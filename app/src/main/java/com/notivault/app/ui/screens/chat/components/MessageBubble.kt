@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Attachment
 import androidx.compose.material.icons.filled.CameraAlt
@@ -35,14 +36,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.notivault.app.data.local.entity.MessageEntity
-import com.notivault.app.ui.theme.DarkSurfaceVariant
-import com.notivault.app.ui.theme.DeletedBadgeBorder
 import com.notivault.app.ui.theme.DeletedRed
-import com.notivault.app.ui.theme.DeletedRedBg
-import com.notivault.app.ui.theme.TealDark
+import com.notivault.app.ui.theme.TealPrimary
 import com.notivault.app.ui.theme.TealSecondary
-import com.notivault.app.ui.theme.TextPrimaryDark
-import com.notivault.app.ui.theme.TextSecondaryDark
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -53,20 +49,21 @@ fun MessageBubble(
     message: MessageEntity,
     isGroup: Boolean,
     modifier: Modifier = Modifier,
-    onMediaClick: ((String) -> Unit)? = null,
-    onMissingMediaClick: ((MessageEntity) -> Unit)? = null
+    onMediaClick: ((String) -> Unit)? = null
 ) {
     val isSelf = message.isSelf
     val isDeleted = message.isDeleted
+    val isDark = isSystemInDarkTheme()
+
     val bubbleColor = when {
-        isDeleted -> Color(0xFF241418)
-        isSelf -> Color(0xFF0D5A54)
-        else -> Color(0xFF1E293B)
+        isDeleted -> if (isDark) Color(0xFF241418) else Color(0xFFFEE2E2)
+        isSelf -> if (isDark) Color(0xFF0D5A54) else Color(0xFFCCFBF1)
+        else -> if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
     }
     val borderColor = when {
-        isDeleted -> DeletedRed.copy(alpha = 0.6f)
-        isSelf -> Color(0xFF14B8A6).copy(alpha = 0.3f)
-        else -> Color(0xFF334155).copy(alpha = 0.6f)
+        isDeleted -> DeletedRed.copy(alpha = 0.5f)
+        isSelf -> if (isDark) Color(0xFF14B8A6).copy(alpha = 0.3f) else TealPrimary.copy(alpha = 0.4f)
+        else -> if (isDark) Color(0xFF334155).copy(alpha = 0.6f) else Color(0xFFCBD5E1).copy(alpha = 0.8f)
     }
     val alignment = if (isSelf) Alignment.End else Alignment.Start
 
@@ -106,22 +103,12 @@ fun MessageBubble(
         val bubbleWidthMin = if (mediaFile != null) 240.dp else 120.dp
         val bubbleWidthMax = if (mediaFile != null) 340.dp else 320.dp
 
-        val boxModifier = if (mediaFile == null && isViewOnce && onMissingMediaClick != null) {
-            Modifier
-                .widthIn(min = bubbleWidthMin, max = bubbleWidthMax)
-                .clip(bubbleShape)
-                .border(1.dp, borderColor, bubbleShape)
-                .background(bubbleColor)
-                .clickable { onMissingMediaClick.invoke(message) }
-                .padding(horizontal = 12.dp, vertical = 10.dp)
-        } else {
-            Modifier
-                .widthIn(min = bubbleWidthMin, max = bubbleWidthMax)
-                .clip(bubbleShape)
-                .border(1.dp, borderColor, bubbleShape)
-                .background(bubbleColor)
-                .padding(horizontal = 12.dp, vertical = 10.dp)
-        }
+        val boxModifier = Modifier
+            .widthIn(min = bubbleWidthMin, max = bubbleWidthMax)
+            .clip(bubbleShape)
+            .border(1.dp, borderColor, bubbleShape)
+            .background(bubbleColor)
+            .padding(horizontal = 12.dp, vertical = 10.dp)
 
         Box(modifier = boxModifier) {
             Column {
@@ -153,11 +140,6 @@ fun MessageBubble(
                                 if (isCached) TealSecondary.copy(alpha = 0.15f)
                                 else Color(0xFFF59E0B).copy(alpha = 0.15f)
                             )
-                            .then(
-                                if (!isCached && onMissingMediaClick != null) {
-                                    Modifier.clickable { onMissingMediaClick.invoke(message) }
-                                } else Modifier
-                            )
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Icon(
@@ -168,7 +150,7 @@ fun MessageBubble(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (isCached) "View Once Preserved" else "View Once (ট্যাপ করে রিকভারি দেখুন)",
+                            text = if (isCached) "View Once Preserved" else "View Once",
                             style = MaterialTheme.typography.labelSmall,
                             color = if (isCached) TealSecondary else Color(0xFFF59E0B),
                             fontWeight = FontWeight.SemiBold
@@ -252,7 +234,7 @@ fun MessageBubble(
                         Text(
                             text = displayMsgText,
                             style = MaterialTheme.typography.bodyLarge,
-                            color = TextPrimaryDark,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = if (isDeleted) FontWeight.SemiBold else FontWeight.Normal
                         )
                     }
@@ -265,20 +247,20 @@ fun MessageBubble(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
-                            .background(Color.White.copy(alpha = 0.05f))
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Attachment,
                             contentDescription = "Attachment",
-                            tint = TextSecondaryDark,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(12.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "Media attachment not available locally",
                             style = MaterialTheme.typography.labelSmall,
-                            color = TextSecondaryDark
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -293,7 +275,7 @@ fun MessageBubble(
                     Text(
                         text = timeFormatted,
                         style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondaryDark
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     if (isSelf) {
                         Spacer(modifier = Modifier.width(4.dp))

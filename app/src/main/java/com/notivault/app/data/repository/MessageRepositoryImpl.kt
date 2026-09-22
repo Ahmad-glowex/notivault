@@ -307,4 +307,14 @@ class MessageRepositoryImpl(
             }
         }
     }
+
+    override fun getMessageCount(): Flow<Int> = messageDao.getMessageCount()
+
+    override suspend fun deleteMessagesOlderThan(days: Int): Int = withContext(Dispatchers.IO) {
+        if (days <= 0) return@withContext 0
+        val cutoff = System.currentTimeMillis() - (days.toLong() * 86_400_000L)
+        val deletedCount = messageDao.deleteMessagesOlderThan(cutoff)
+        chatDao.deleteEmptyThreads()
+        deletedCount
+    }
 }
