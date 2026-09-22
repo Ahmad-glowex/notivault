@@ -44,5 +44,7 @@ class MessageBubbleTest {
         assertFalse(isMediaPlaceholderText("Check this photo out!"))
         assertFalse(isMediaPlaceholderText("Here is the meeting notes video"))
         assertFalse(isMediaPlaceholderText("আজকে মিটিং আছে"))
+        assertFalse(isMediaPlaceholderText("احبك كثيرا"))
+        assertFalse(isMediaPlaceholderText("مرحبا كيف حالك"))
     }
 }

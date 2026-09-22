@@ -43,6 +43,9 @@ interface MessageRepository {
     suspend fun clearAllDeletedMessages()
     suspend fun clearAllData()
     suspend fun setAppMonitoring(packageName: String, isEnabled: Boolean)
+    fun getEnabledApps(): Flow<List<AppEntity>>
+    suspend fun addMonitoredApp(app: AppEntity)
+    suspend fun deleteMonitoredApp(packageName: String)
     suspend fun deduplicateExistingMessages(threadId: String? = null)
     fun getMessageCount(): Flow<Int>
     suspend fun deleteMessagesOlderThan(days: Int): Int

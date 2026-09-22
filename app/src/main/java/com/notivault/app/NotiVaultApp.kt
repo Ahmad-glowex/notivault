@@ -48,15 +48,25 @@ class NotiVaultApp : Application() {
                 // 3. Deduplicate messages
                 messageRepository.deduplicateExistingMessages()
 
-                // 4. Pre-populate standard supported apps
-                val defaultApps = listOf(
-                    com.notivault.app.data.local.entity.AppEntity("com.whatsapp", "WhatsApp", isEnabled = true, colorHex = "#25D366"),
-                    com.notivault.app.data.local.entity.AppEntity("com.whatsapp.w4b", "WhatsApp Business", isEnabled = true, colorHex = "#25D366"),
-                    com.notivault.app.data.local.entity.AppEntity("com.facebook.orca", "Messenger", isEnabled = true, colorHex = "#0084FF"),
-                    com.notivault.app.data.local.entity.AppEntity("org.telegram.messenger", "Telegram", isEnabled = true, colorHex = "#229ED9"),
-                    com.notivault.app.data.local.entity.AppEntity("com.instagram.android", "Instagram", isEnabled = true, colorHex = "#E1306C")
-                )
-                database.appDao().insertApps(defaultApps)
+                // 4. One-time migration to core messaging apps whitelist
+                val prefs = getSharedPreferences("notivault_settings", android.content.Context.MODE_PRIVATE)
+                val isMigrated = prefs.getBoolean("migrated_core_whitelist_v109", false)
+                if (!isMigrated) {
+                    val existingApps = database.appDao().getAllAppsSync()
+                    for (appItem in existingApps) {
+                        if (!com.notivault.app.data.local.CoreApps.isCoreApp(appItem.packageName)) {
+                            database.appDao().deleteApp(appItem.packageName)
+                            database.chatDao().deleteThreadsByPackage(appItem.packageName)
+                            database.messageDao().deleteMessagesByPackage(appItem.packageName)
+                            database.mediaDao().deleteMediaByPackage(appItem.packageName)
+                        }
+                    }
+                    database.appDao().insertApps(com.notivault.app.data.local.CoreApps.DEFAULT_APPS)
+                    prefs.edit().putBoolean("migrated_core_whitelist_v109", true).apply()
+                } else {
+                    // Core apps are seeded if missing, custom added apps are preserved across restarts
+                    database.appDao().insertApps(com.notivault.app.data.local.CoreApps.DEFAULT_APPS)
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }

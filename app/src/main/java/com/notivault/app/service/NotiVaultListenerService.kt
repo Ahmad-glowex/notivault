@@ -65,12 +65,22 @@ class NotiVaultListenerService : NotificationListenerService() {
                     return@launch
                 }
 
-                // Ensure the app entity exists in DB
-                ensureAppRegistered(app, packageName)
-
+                // Check if app is monitored. By default, ONLY core messaging apps are allowed.
+                // Any other app (e.g. ChatGPT, Grove, Muse, Gmail) is NOT captured unless explicitly added by user.
                 val appEntity = app.database.appDao().getApp(packageName)
-                if (appEntity != null && !appEntity.isEnabled) {
-                    Log.d(TAG, "Monitoring is disabled for $packageName, skipping notification")
+                val isMonitored = when {
+                    appEntity != null -> appEntity.isEnabled
+                    com.notivault.app.data.local.CoreApps.isCoreApp(packageName) -> {
+                        ensureCoreAppRegistered(app, packageName)
+                        true
+                    }
+                    else -> {
+                        Log.d(TAG, "Skipping notification from non-monitored app: $packageName")
+                        false
+                    }
+                }
+
+                if (!isMonitored) {
                     return@launch
                 }
 
@@ -187,7 +197,8 @@ class NotiVaultListenerService : NotificationListenerService() {
         }
     }
 
-    private suspend fun ensureAppRegistered(app: NotiVaultApp, packageName: String) {
+    private suspend fun ensureCoreAppRegistered(app: NotiVaultApp, packageName: String) {
+        if (!com.notivault.app.data.local.CoreApps.isCoreApp(packageName)) return
         val appDao = app.database.appDao()
         val existing = appDao.getApp(packageName)
         if (existing == null) {
@@ -196,15 +207,16 @@ class NotiVaultListenerService : NotificationListenerService() {
                 val info = pm.getApplicationInfo(packageName, 0)
                 pm.getApplicationLabel(info).toString()
             } catch (_: Exception) {
-                packageName
+                when (packageName) {
+                    com.notivault.app.data.local.CoreApps.PACKAGE_WHATSAPP -> "WhatsApp"
+                    com.notivault.app.data.local.CoreApps.PACKAGE_WHATSAPP_W4B -> "WhatsApp Business"
+                    com.notivault.app.data.local.CoreApps.PACKAGE_MESSENGER -> "Messenger"
+                    com.notivault.app.data.local.CoreApps.PACKAGE_TELEGRAM -> "Telegram"
+                    com.notivault.app.data.local.CoreApps.PACKAGE_INSTAGRAM -> "Instagram"
+                    else -> packageName
+                }
             }
-            val colorHex = when (packageName) {
-                "com.whatsapp" -> "#25D366"
-                "com.facebook.orca" -> "#0084FF"
-                "com.instagram.android" -> "#E1306C"
-                "org.telegram.messenger" -> "#229ED9"
-                else -> "#6366F1"
-            }
+            val colorHex = com.notivault.app.data.local.CoreApps.getDefaultColor(packageName)
             appDao.insertApp(
                 AppEntity(
                     packageName = packageName,

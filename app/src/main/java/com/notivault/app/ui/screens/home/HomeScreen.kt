@@ -62,6 +62,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.notivault.app.ui.screens.home.components.AppFilterTabs
 import com.notivault.app.ui.screens.home.components.AppTab
+import com.notivault.app.ui.screens.home.components.DynamicAppFilterTabs
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -89,7 +90,8 @@ fun HomeScreen(
     viewModel: HomeViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val selectedTab by viewModel.selectedTab.collectAsState()
+    val selectedPackage by viewModel.selectedPackage.collectAsState()
+    val enabledApps by viewModel.enabledApps.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val threads by viewModel.threads.collectAsState()
     val isPermissionGranted by viewModel.isPermissionGranted.collectAsState()
@@ -446,10 +448,11 @@ fun HomeScreen(
                 singleLine = true
             )
 
-            // App Filter Tabs
-            AppFilterTabs(
-                selectedTab = selectedTab,
-                onTabSelected = { tab -> viewModel.selectTab(tab) }
+            // App Filter Tabs (dynamically showing All + enabled messaging & custom apps)
+            DynamicAppFilterTabs(
+                enabledApps = enabledApps,
+                selectedPackage = selectedPackage,
+                onPackageSelected = { pkg -> viewModel.selectPackage(pkg) }
             )
 
             // Chat Threads List
@@ -478,7 +481,7 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = if (searchQuery.isNotBlank()) "Try a different search term" else "Incoming notifications from WhatsApp, Messenger, and Instagram will automatically appear here with deleted message preservation.",
+                            text = if (searchQuery.isNotBlank()) "Try a different search term" else "Incoming notifications from WhatsApp, Telegram, Messenger, and Instagram will automatically appear here with deleted message preservation.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center

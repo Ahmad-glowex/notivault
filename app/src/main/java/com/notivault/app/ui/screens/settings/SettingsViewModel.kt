@@ -110,6 +110,37 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun addMonitoredApp(packageName: String, appName: String, colorHex: String? = null) {
+        viewModelScope.launch {
+            val resolvedColor = colorHex ?: com.notivault.app.data.local.CoreApps.getDefaultColor(packageName)
+            val appEntity = AppEntity(
+                packageName = packageName,
+                appName = appName,
+                isEnabled = true,
+                colorHex = resolvedColor
+            )
+            messageRepo.addMonitoredApp(appEntity)
+        }
+    }
+
+    fun removeMonitoredApp(packageName: String) {
+        viewModelScope.launch {
+            messageRepo.deleteMonitoredApp(packageName)
+        }
+    }
+
+    fun resetToDefaultApps() {
+        viewModelScope.launch {
+            val allApps = app.database.appDao().getAllAppsSync()
+            for (item in allApps) {
+                if (!com.notivault.app.data.local.CoreApps.isCoreApp(item.packageName)) {
+                    messageRepo.deleteMonitoredApp(item.packageName)
+                }
+            }
+            app.database.appDao().insertApps(com.notivault.app.data.local.CoreApps.DEFAULT_APPS)
+        }
+    }
+
     fun exportAllToJson(context: Context) {
         viewModelScope.launch {
             val allMessages = messageRepo.getAllMessages()

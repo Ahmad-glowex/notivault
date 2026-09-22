@@ -13,6 +13,9 @@ interface AppDao {
     @Query("SELECT * FROM monitored_apps ORDER BY lastActivityTimestamp DESC")
     fun getAllApps(): Flow<List<AppEntity>>
 
+    @Query("SELECT * FROM monitored_apps ORDER BY lastActivityTimestamp DESC")
+    suspend fun getAllAppsSync(): List<AppEntity>
+
     @Query("SELECT * FROM monitored_apps WHERE isEnabled = 1")
     fun getEnabledApps(): Flow<List<AppEntity>>
 
@@ -33,6 +36,9 @@ interface AppDao {
 
     @Query("UPDATE monitored_apps SET isEnabled = :isEnabled WHERE packageName = :packageName")
     suspend fun setAppEnabled(packageName: String, isEnabled: Boolean)
+
+    @Query("DELETE FROM monitored_apps WHERE packageName = :packageName")
+    suspend fun deleteApp(packageName: String)
 
     @Query("""
         UPDATE monitored_apps 

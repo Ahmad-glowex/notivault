@@ -15,6 +15,7 @@ class MessageRepositoryImpl(
     private val appDao = db.appDao()
     private val chatDao = db.chatDao()
     private val messageDao = db.messageDao()
+    private val mediaDao = db.mediaDao()
 
     override fun getAllThreads(): Flow<List<ChatThreadEntity>> = chatDao.getAllThreads()
 
@@ -279,6 +280,20 @@ class MessageRepositoryImpl(
         withContext(Dispatchers.IO) {
             appDao.setAppEnabled(packageName, isEnabled)
         }
+
+    override fun getEnabledApps(): Flow<List<AppEntity>> = appDao.getEnabledApps()
+
+    override suspend fun addMonitoredApp(app: AppEntity) = withContext(Dispatchers.IO) {
+        appDao.insertOrUpdateApp(app)
+    }
+
+    override suspend fun deleteMonitoredApp(packageName: String): Unit = withContext(Dispatchers.IO) {
+        appDao.deleteApp(packageName)
+        chatDao.deleteThreadsByPackage(packageName)
+        messageDao.deleteMessagesByPackage(packageName)
+        mediaDao.deleteMediaByPackage(packageName)
+        Unit
+    }
 
     override suspend fun deduplicateExistingMessages(threadId: String?) = withContext(Dispatchers.IO) {
         val messages = if (threadId != null) {

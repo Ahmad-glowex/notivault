@@ -95,4 +95,7 @@ interface MediaDao {
 
     @Query("DELETE FROM saved_media WHERE timestamp < :cutoff")
     suspend fun deleteMediaOlderThan(cutoff: Long): Int
+
+    @Query("DELETE FROM saved_media WHERE packageName = :packageName")
+    suspend fun deleteMediaByPackage(packageName: String): Int
 }

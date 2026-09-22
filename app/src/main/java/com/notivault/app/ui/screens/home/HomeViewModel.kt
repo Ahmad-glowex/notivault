@@ -22,8 +22,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val messageRepo = app.messageRepository
     private val mediaRepo = app.mediaRepository
 
+    private val _selectedPackage = MutableStateFlow<String?>(null)
+    val selectedPackage: StateFlow<String?> = _selectedPackage.asStateFlow()
+
     private val _selectedTab = MutableStateFlow(AppTab.ALL)
     val selectedTab: StateFlow<AppTab> = _selectedTab.asStateFlow()
+
+    val enabledApps: StateFlow<List<com.notivault.app.data.local.entity.AppEntity>> = messageRepo.getEnabledApps()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -37,13 +43,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     val mediaCount: StateFlow<Int> = mediaRepo.getMediaCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    val threads: StateFlow<List<ChatThreadEntity>> = combine(_selectedTab, _searchQuery) { tab, query ->
-        Pair(tab, query)
-    }.flatMapLatest { (tab, query) ->
+    val threads: StateFlow<List<ChatThreadEntity>> = combine(_selectedPackage, _searchQuery) { pkg, query ->
+        Pair(pkg, query)
+    }.flatMapLatest { (pkg, query) ->
         val flow = if (query.isNotBlank()) {
-            messageRepo.searchThreads(query, tab.packageName)
-        } else if (tab.packageName != null) {
-            messageRepo.getThreadsByPackage(tab.packageName)
+            messageRepo.searchThreads(query, pkg)
+        } else if (pkg != null) {
+            messageRepo.getThreadsByPackage(pkg)
         } else {
             messageRepo.getAllThreads()
         }
@@ -56,8 +62,21 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun selectPackage(packageName: String?) {
+        _selectedPackage.value = packageName
+        _selectedTab.value = when (packageName) {
+            com.notivault.app.data.local.CoreApps.PACKAGE_WHATSAPP,
+            com.notivault.app.data.local.CoreApps.PACKAGE_WHATSAPP_W4B -> AppTab.WHATSAPP
+            com.notivault.app.data.local.CoreApps.PACKAGE_TELEGRAM -> AppTab.TELEGRAM
+            com.notivault.app.data.local.CoreApps.PACKAGE_MESSENGER -> AppTab.MESSENGER
+            com.notivault.app.data.local.CoreApps.PACKAGE_INSTAGRAM -> AppTab.INSTAGRAM
+            else -> AppTab.ALL
+        }
+    }
+
     fun selectTab(tab: AppTab) {
         _selectedTab.value = tab
+        _selectedPackage.value = tab.packageName
     }
 
     fun onSearchQueryChanged(query: String) {

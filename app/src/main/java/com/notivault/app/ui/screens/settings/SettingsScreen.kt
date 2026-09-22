@@ -74,10 +74,35 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import android.content.pm.PackageManager
+import android.graphics.drawable.Drawable
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Badge
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.core.graphics.drawable.toBitmap
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.notivault.app.data.local.CoreApps
+import com.notivault.app.ui.components.VaultSwitch
+import com.notivault.app.ui.theme.WhatsAppGreen
 import com.notivault.app.ui.screens.home.components.isNotificationAccessGranted
 import com.notivault.app.ui.theme.DeletedRed
 import com.notivault.app.ui.theme.TealSecondary
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -102,6 +127,8 @@ fun SettingsScreen(
     val exportIntent by viewModel.exportIntent.collectAsState()
 
     var showWipeConfirmDialog by remember { mutableStateOf(false) }
+    var showAddAppDialog by remember { mutableStateOf(false) }
+    var showResetAppsConfirmDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(exportIntent) {
         exportIntent?.let { intent ->
@@ -271,10 +298,9 @@ fun SettingsScreen(
                                 color = if (isInterceptionEnabled) TealSecondary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        Switch(
+                        VaultSwitch(
                             checked = isInterceptionEnabled,
-                            onCheckedChange = { viewModel.setInterception(it) },
-                            colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
+                            onCheckedChange = { viewModel.setInterception(it) }
                         )
                     }
 
@@ -301,10 +327,9 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        Switch(
+                        VaultSwitch(
                             checked = isDeletedAlertEnabled,
-                            onCheckedChange = { viewModel.setDeletedAlert(it) },
-                            colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
+                            onCheckedChange = { viewModel.setDeletedAlert(it) }
                         )
                     }
 
@@ -331,10 +356,9 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        Switch(
+                        VaultSwitch(
                             checked = isMediaBackupEnabled,
-                            onCheckedChange = { viewModel.setMediaBackup(it) },
-                            colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
+                            onCheckedChange = { viewModel.setMediaBackup(it) }
                         )
                     }
 
@@ -434,24 +458,44 @@ fun SettingsScreen(
                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Security,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Monitored Apps Customization",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.Bold
-                        )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(
+                                imageVector = Icons.Default.Security,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Monitored Apps Customization",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        // Add App Button
+                        Button(
+                            onClick = { showAddAppDialog = true },
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            modifier = Modifier.height(34.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Add App", style = MaterialTheme.typography.labelSmall)
+                        }
                     }
+
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Enable or disable monitoring for specific messaging apps",
+                        text = "WhatsApp, Messenger, Telegram, and Instagram are monitored by default. You can toggle them or add any other app.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -459,7 +503,7 @@ fun SettingsScreen(
 
                     if (monitoredApps.isEmpty()) {
                         Text(
-                            text = "Standard messaging apps will appear automatically as notifications arrive.",
+                            text = "No apps monitored. Tap 'Add App' or reset defaults below.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -471,6 +515,9 @@ fun SettingsScreen(
                                     modifier = Modifier.padding(vertical = 8.dp)
                                 )
                             }
+                            val isCore = CoreApps.isCoreApp(app.packageName)
+                            val isWhatsApp = CoreApps.isWhatsApp(app.packageName)
+
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -494,12 +541,46 @@ fun SettingsScreen(
                                     )
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Column {
-                                        Text(
-                                            text = app.appName,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = app.appName,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            // Badge indicating Core / Main / Custom
+                                            val badgeBg = when {
+                                                isWhatsApp -> WhatsAppGreen.copy(alpha = 0.18f)
+                                                isCore -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                                                else -> Color(0xFF6366F1).copy(alpha = 0.18f)
+                                            }
+                                            val badgeText = when {
+                                                isWhatsApp -> "Main"
+                                                isCore -> "Core"
+                                                else -> "Custom"
+                                            }
+                                            val badgeColor = when {
+                                                isWhatsApp -> Color(0xFF16A34A)
+                                                isCore -> MaterialTheme.colorScheme.primary
+                                                else -> Color(0xFF6366F1)
+                                            }
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .background(badgeBg)
+                                                    .padding(horizontal = 5.dp, vertical = 1.dp)
+                                            ) {
+                                                Text(
+                                                    text = badgeText,
+                                                    style = MaterialTheme.typography.labelSmall.copy(
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = androidx.compose.ui.unit.TextUnit(10f, androidx.compose.ui.unit.TextUnitType.Sp)
+                                                    ),
+                                                    color = badgeColor
+                                                )
+                                            }
+                                        }
                                         Text(
                                             text = if (app.isEnabled) "Monitoring active" else "Monitoring paused",
                                             style = MaterialTheme.typography.labelSmall,
@@ -507,13 +588,46 @@ fun SettingsScreen(
                                         )
                                     }
                                 }
-                                Switch(
-                                    checked = app.isEnabled,
-                                    onCheckedChange = { viewModel.toggleAppMonitoring(app.packageName, it) },
-                                    colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
-                                )
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    // If custom app, show trash icon to remove it
+                                    if (!isCore) {
+                                        IconButton(
+                                            onClick = {
+                                                viewModel.removeMonitoredApp(app.packageName)
+                                                Toast.makeText(context, "Removed ${app.appName}", Toast.LENGTH_SHORT).show()
+                                            },
+                                            modifier = Modifier.size(36.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.DeleteOutline,
+                                                contentDescription = "Remove App",
+                                                tint = DeletedRed,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                    }
+
+                                    VaultSwitch(
+                                        checked = app.isEnabled,
+                                        onCheckedChange = { viewModel.toggleAppMonitoring(app.packageName, it) }
+                                    )
+                                }
                             }
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedButton(
+                        onClick = { showResetAppsConfirmDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 8.dp)
+                    ) {
+                        Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Reset to Core Messaging Apps (WhatsApp, Messenger, etc.)", style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
@@ -700,10 +814,9 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        Switch(
+                        VaultSwitch(
                             checked = isBiometricEnabled,
-                            onCheckedChange = { viewModel.setBiometricLock(it) },
-                            colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
+                            onCheckedChange = { viewModel.setBiometricLock(it) }
                         )
                     }
 
@@ -729,10 +842,9 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        Switch(
+                        VaultSwitch(
                             checked = isSecureWindowEnabled,
-                            onCheckedChange = { viewModel.setSecureWindow(it) },
-                            colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
+                            onCheckedChange = { viewModel.setSecureWindow(it) }
                         )
                     }
                 }
@@ -876,7 +988,292 @@ fun SettingsScreen(
             }
         )
     }
+
+    if (showResetAppsConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetAppsConfirmDialog = false },
+            title = { Text("Reset to Core Messaging Apps?", fontWeight = FontWeight.Bold) },
+            text = {
+                Text("This will remove all custom monitored apps and restore monitoring strictly for WhatsApp, Messenger, Telegram, and Instagram.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.resetToDefaultApps()
+                        showResetAppsConfirmDialog = false
+                        Toast.makeText(context, "Reset to core messaging apps.", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("Reset Apps", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetAppsConfirmDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showAddAppDialog) {
+        val monitoredSet = remember(monitoredApps) { monitoredApps.map { it.packageName }.toSet() }
+        AppPickerDialog(
+            onDismiss = { showAddAppDialog = false },
+            onAppSelected = { pkg, name ->
+                viewModel.addMonitoredApp(pkg, name)
+                showAddAppDialog = false
+                Toast.makeText(context, "Added $name to monitored apps", Toast.LENGTH_SHORT).show()
+            },
+            alreadyMonitoredPackages = monitoredSet
+        )
+    }
 }
+
+@Composable
+fun AppPickerDialog(
+    onDismiss: () -> Unit,
+    onAppSelected: (packageName: String, appName: String) -> Unit,
+    alreadyMonitoredPackages: Set<String>
+) {
+    val context = LocalContext.current
+    var searchQuery by remember { mutableStateOf("") }
+    var installedApps by remember { mutableStateOf<List<InstalledAppItem>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            val pm = context.packageManager
+            val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
+                addCategory(Intent.CATEGORY_LAUNCHER)
+            }
+            val resolveList = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.queryIntentActivities(mainIntent, PackageManager.ResolveInfoFlags.of(0L))
+            } else {
+                pm.queryIntentActivities(mainIntent, 0)
+            }
+
+            val seen = mutableSetOf<String>()
+            val list = mutableListOf<InstalledAppItem>()
+            for (ri in resolveList) {
+                val pkg = ri.activityInfo.packageName
+                if (pkg == context.packageName || seen.contains(pkg)) continue
+                seen.add(pkg)
+                val label = ri.loadLabel(pm).toString()
+                val icon = ri.loadIcon(pm)
+                val bitmap = try {
+                    icon.toBitmap(72, 72).asImageBitmap()
+                } catch (_: Exception) { null }
+                list.add(InstalledAppItem(pkg, label, bitmap))
+            }
+
+            if (list.isEmpty()) {
+                val apps = pm.getInstalledApplications(0)
+                for (appInfo in apps) {
+                    val pkg = appInfo.packageName
+                    if (pkg == context.packageName || seen.contains(pkg)) continue
+                    seen.add(pkg)
+                    val label = pm.getApplicationLabel(appInfo).toString()
+                    val icon = pm.getApplicationIcon(appInfo)
+                    val bitmap = try {
+                        icon.toBitmap(72, 72).asImageBitmap()
+                    } catch (_: Exception) { null }
+                    list.add(InstalledAppItem(pkg, label, bitmap))
+                }
+            }
+
+            installedApps = list.sortedBy { it.appName.lowercase(Locale.getDefault()) }
+            isLoading = false
+        }
+    }
+
+    val filteredApps = remember(searchQuery, installedApps) {
+        if (searchQuery.isBlank()) installedApps
+        else {
+            val q = searchQuery.trim().lowercase(Locale.getDefault())
+            installedApps.filter {
+                it.appName.lowercase(Locale.getDefault()).contains(q) ||
+                it.packageName.lowercase(Locale.getDefault()).contains(q)
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Apps, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Select App to Monitor", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+            ) {
+                Text(
+                    text = "Pick an installed app to intercept messages and save notifications.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Search installed apps...", style = MaterialTheme.typography.bodySmall) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    trailingIcon = {
+                        if (searchQuery.isNotBlank()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                if (isLoading) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(36.dp),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "Loading installed apps...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                } else if (filteredApps.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (searchQuery.isBlank()) "No installed apps found" else "No apps matching '$searchQuery'",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(filteredApps, key = { it.packageName }) { appItem ->
+                            val isAlreadyAdded = appItem.packageName in alreadyMonitoredPackages
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable(enabled = !isAlreadyAdded) {
+                                        onAppSelected(appItem.packageName, appItem.appName)
+                                    }
+                                    .padding(vertical = 8.dp, horizontal = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    if (appItem.iconBitmap != null) {
+                                        Image(
+                                            bitmap = appItem.iconBitmap,
+                                            contentDescription = appItem.appName,
+                                            modifier = Modifier.size(36.dp)
+                                        )
+                                    } else {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(36.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Apps,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(20.dp),
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = appItem.appName,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = appItem.packageName,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                                if (isAlreadyAdded) {
+                                    Text(
+                                        text = "Monitored",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(start = 8.dp)
+                                    )
+                                } else {
+                                    Button(
+                                        onClick = { onAppSelected(appItem.packageName, appItem.appName) },
+                                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.height(30.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                    ) {
+                                        Text("Add", style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
+}
+
+data class InstalledAppItem(
+    val packageName: String,
+    val appName: String,
+    val iconBitmap: ImageBitmap?
+)
 
 private fun formatBytes(bytes: Long): String {
     if (bytes <= 0) return "0 KB"

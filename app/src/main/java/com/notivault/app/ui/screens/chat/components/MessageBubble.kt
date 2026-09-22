@@ -16,7 +16,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Attachment
 import androidx.compose.material.icons.filled.CameraAlt
@@ -53,18 +54,31 @@ fun MessageBubble(
 ) {
     val isSelf = message.isSelf
     val isDeleted = message.isDeleted
-    val isDark = isSystemInDarkTheme()
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
     val bubbleColor = when {
-        isDeleted -> if (isDark) Color(0xFF241418) else Color(0xFFFEE2E2)
-        isSelf -> if (isDark) Color(0xFF0D5A54) else Color(0xFFCCFBF1)
-        else -> if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
+        isDeleted -> if (isDark) Color(0xFF2B1418) else Color(0xFFFEF2F2)
+        isSelf -> if (isDark) Color(0xFF0F5147) else Color(0xFFDCFCE7)
+        else -> if (isDark) Color(0xFF1E293B) else Color(0xFFFFFFFF)
     }
     val borderColor = when {
-        isDeleted -> DeletedRed.copy(alpha = 0.5f)
-        isSelf -> if (isDark) Color(0xFF14B8A6).copy(alpha = 0.3f) else TealPrimary.copy(alpha = 0.4f)
-        else -> if (isDark) Color(0xFF334155).copy(alpha = 0.6f) else Color(0xFFCBD5E1).copy(alpha = 0.8f)
+        isDeleted -> if (isDark) Color(0xFF7F1D1D) else Color(0xFFFECACA)
+        isSelf -> if (isDark) Color(0xFF14B8A6).copy(alpha = 0.4f) else Color(0xFFBBF7D0)
+        else -> if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0)
     }
+    val messageTextColor = when {
+        isDeleted -> if (isDark) Color(0xFFFCA5A5) else Color(0xFF991B1B)
+        isSelf -> if (isDark) Color(0xFFF0FDFA) else Color(0xFF064E3B)
+        else -> if (isDark) Color(0xFFF8FAFC) else Color(0xFF0F172A)
+    }
+    val timestampColor = when {
+        isDeleted -> if (isDark) Color(0xFFEF4444) else Color(0xFFB91C1C)
+        isSelf -> if (isDark) Color(0xFFA7F3D0) else Color(0xFF047857)
+        else -> if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
+    }
+    val senderColor = if (isDark) Color(0xFF2DD4BF) else Color(0xFF0F766E)
+    val checkColor = if (isDark) Color(0xFF2DD4BF) else Color(0xFF059669)
+    val mediaIconColor = if (isDark) Color(0xFF2DD4BF) else Color(0xFF0F766E)
     val alignment = if (isSelf) Alignment.End else Alignment.Start
 
     val timeFormatted = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(message.timestamp))
@@ -100,7 +114,7 @@ fun MessageBubble(
             .padding(vertical = 3.dp),
         horizontalAlignment = alignment
     ) {
-        val bubbleWidthMin = if (mediaFile != null) 240.dp else 120.dp
+        val bubbleWidthMin = if (mediaFile != null) 220.dp else 72.dp
         val bubbleWidthMax = if (mediaFile != null) 340.dp else 320.dp
 
         val boxModifier = Modifier
@@ -117,7 +131,7 @@ fun MessageBubble(
                     Text(
                         text = message.senderName,
                         style = MaterialTheme.typography.labelMedium,
-                        color = TealSecondary,
+                        color = senderColor,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
@@ -132,27 +146,26 @@ fun MessageBubble(
                 // View Once indicator
                 if (isViewOnce) {
                     val isCached = mediaFile != null
+                    val voBg = if (isCached) (if (isDark) TealSecondary.copy(alpha = 0.2f) else Color(0xFFCCFBF1)) else (if (isDark) Color(0xFFF59E0B).copy(alpha = 0.2f) else Color(0xFFFEF3C7))
+                    val voTextCol = if (isCached) (if (isDark) Color(0xFF2DD4BF) else Color(0xFF0F766E)) else (if (isDark) Color(0xFFFBBF24) else Color(0xFFB45309))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .background(
-                                if (isCached) TealSecondary.copy(alpha = 0.15f)
-                                else Color(0xFFF59E0B).copy(alpha = 0.15f)
-                            )
+                            .background(voBg)
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Visibility,
                             contentDescription = null,
-                            tint = if (isCached) TealSecondary else Color(0xFFF59E0B),
+                            tint = voTextCol,
                             modifier = Modifier.size(12.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = if (isCached) "View Once Preserved" else "View Once",
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (isCached) TealSecondary else Color(0xFFF59E0B),
+                            color = voTextCol,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -211,30 +224,41 @@ fun MessageBubble(
                         else -> cleanMsgText
                     }
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    val hasMediaIcon = mediaFile == null && (isVideoMsg || isPhoto)
+                    Row(
+                        verticalAlignment = if (hasMediaIcon) Alignment.Top else Alignment.CenterVertically,
+                        modifier = Modifier.padding(vertical = 1.dp)
+                    ) {
                         if (mediaFile == null) {
                             if (isVideoMsg) {
                                 Icon(
                                     imageVector = Icons.Default.Videocam,
                                     contentDescription = null,
-                                    tint = TealSecondary,
-                                    modifier = Modifier.size(16.dp)
+                                    tint = mediaIconColor,
+                                    modifier = Modifier
+                                        .padding(top = 2.dp)
+                                        .size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                             } else if (isPhoto) {
                                 Icon(
                                     imageVector = Icons.Default.CameraAlt,
                                     contentDescription = null,
-                                    tint = TealSecondary,
-                                    modifier = Modifier.size(15.dp)
+                                    tint = mediaIconColor,
+                                    modifier = Modifier
+                                        .padding(top = 2.dp)
+                                        .size(15.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                             }
                         }
                         Text(
                             text = displayMsgText,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontSize = 15.5.sp,
+                                lineHeight = 23.sp
+                            ),
+                            color = messageTextColor,
                             fontWeight = if (isDeleted) FontWeight.SemiBold else FontWeight.Normal
                         )
                     }
@@ -243,24 +267,26 @@ fun MessageBubble(
                 // Subtle media indicator only if a media URI was logged but missing on disk
                 if (message.hasMedia && !message.mediaUri.isNullOrBlank() && mediaFile == null) {
                     Spacer(modifier = Modifier.height(4.dp))
+                    val missingMediaBg = if (isDark) Color(0xFF334155).copy(alpha = 0.5f) else Color(0xFFF1F5F9)
+                    val missingMediaText = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
-                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+                            .background(missingMediaBg)
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Attachment,
                             contentDescription = "Attachment",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = missingMediaText,
                             modifier = Modifier.size(12.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "Media attachment not available locally",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = missingMediaText
                         )
                     }
                 }
@@ -275,14 +301,14 @@ fun MessageBubble(
                     Text(
                         text = timeFormatted,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = timestampColor
                     )
                     if (isSelf) {
                         Spacer(modifier = Modifier.width(4.dp))
                         Icon(
                             imageVector = Icons.Default.Check,
                             contentDescription = "Sent",
-                            tint = TealSecondary,
+                            tint = checkColor,
                             modifier = Modifier.size(12.dp)
                         )
                     }

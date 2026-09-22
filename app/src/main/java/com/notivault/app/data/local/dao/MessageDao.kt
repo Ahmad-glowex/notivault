@@ -212,4 +212,7 @@ interface MessageDao {
 
     @Query("DELETE FROM messages WHERE timestamp < :cutoff")
     suspend fun deleteMessagesOlderThan(cutoff: Long): Int
+
+    @Query("DELETE FROM messages WHERE packageName = :packageName")
+    suspend fun deleteMessagesByPackage(packageName: String): Int
 }

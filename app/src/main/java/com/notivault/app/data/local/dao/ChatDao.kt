@@ -11,7 +11,12 @@ interface ChatDao {
     @Query("SELECT * FROM chat_threads ORDER BY isPinned DESC, lastMessageTimestamp DESC")
     fun getAllThreads(): Flow<List<ChatThreadEntity>>
 
-    @Query("SELECT * FROM chat_threads WHERE packageName = :packageName ORDER BY isPinned DESC, lastMessageTimestamp DESC")
+    @Query("""
+        SELECT * FROM chat_threads 
+        WHERE (:packageName IN ('com.whatsapp', 'com.whatsapp.w4b') AND packageName IN ('com.whatsapp', 'com.whatsapp.w4b'))
+           OR (:packageName NOT IN ('com.whatsapp', 'com.whatsapp.w4b') AND packageName = :packageName)
+        ORDER BY isPinned DESC, lastMessageTimestamp DESC
+    """)
     fun getThreadsByPackage(packageName: String): Flow<List<ChatThreadEntity>>
 
     @Query("SELECT * FROM chat_threads WHERE threadId = :threadId LIMIT 1")
@@ -33,7 +38,8 @@ interface ChatDao {
 
     @Query("""
         SELECT * FROM chat_threads 
-        WHERE packageName = :packageName 
+        WHERE ((:packageName IN ('com.whatsapp', 'com.whatsapp.w4b') AND packageName IN ('com.whatsapp', 'com.whatsapp.w4b'))
+           OR (:packageName NOT IN ('com.whatsapp', 'com.whatsapp.w4b') AND packageName = :packageName))
           AND (chatTitle LIKE '%' || :query || '%' OR lastMessageText LIKE '%' || :query || '%')
         ORDER BY lastMessageTimestamp DESC
     """)
@@ -44,6 +50,9 @@ interface ChatDao {
 
     @Query("DELETE FROM chat_threads WHERE threadId = :threadId")
     suspend fun deleteThread(threadId: String)
+
+    @Query("DELETE FROM chat_threads WHERE packageName = :packageName")
+    suspend fun deleteThreadsByPackage(packageName: String)
 
     @Query("DELETE FROM chat_threads")
     suspend fun deleteAllThreads()
