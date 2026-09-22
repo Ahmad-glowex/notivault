@@ -128,4 +128,23 @@ class NotificationParserTest {
         assertTrue(NotificationParser.isMediaIndicatingText("video"))
         assertTrue(NotificationParser.isMediaIndicatingText("View once"))
     }
+
+    @Test
+    fun testSummaryPlaceholderDetection() {
+        // Pure summary placeholder texts
+        assertTrue(NotificationParser.isSummaryPlaceholderText("3 new messages"))
+        assertTrue(NotificationParser.isSummaryPlaceholderText("5 messages from 2 chats"))
+        assertTrue(NotificationParser.isSummaryPlaceholderText("3টি নতুন মেসেজ"))
+        assertTrue(NotificationParser.isSummaryPlaceholderText("2টি চ্যাট থেকে 4টি মেসেজ"))
+        assertTrue(NotificationParser.isSummaryPlaceholderText("1 new message"))
+        assertTrue(NotificationParser.isSummaryPlaceholderText("5 unread messages"))
+        assertTrue(NotificationParser.isSummaryPlaceholderText(""))
+
+        // Real chat messages must NEVER be treated as summary placeholders
+        assertFalse(NotificationParser.isSummaryPlaceholderText("Hey are you coming?"))
+        assertFalse(NotificationParser.isSummaryPlaceholderText("This message was deleted"))
+        assertFalse(NotificationParser.isSummaryPlaceholderText("এই বার্তাটি মুছে ফেলা হয়েছে"))
+        assertFalse(NotificationParser.isSummaryPlaceholderText("Let's meet tomorrow"))
+        assertFalse(NotificationParser.isSummaryPlaceholderText("I sent you 3 pictures"))
+    }
 }

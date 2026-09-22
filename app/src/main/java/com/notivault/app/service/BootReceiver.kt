@@ -7,7 +7,6 @@ import com.notivault.app.NotiVaultApp
 import com.notivault.app.service.media.MediaObserverService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class BootReceiver : BroadcastReceiver {
@@ -17,11 +16,18 @@ class BootReceiver : BroadcastReceiver {
         if (context == null || intent == null) return
         val action = intent.action
         if (action == Intent.ACTION_BOOT_COMPLETED || action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+            // Re-bind / ensure NotificationListenerService connection on reboot or app update
+            NotiVaultListenerService.ensureServiceConnected(context)
+
             val app = context.applicationContext as? NotiVaultApp ?: return
             CoroutineScope(Dispatchers.IO).launch {
-                val isMediaBackupEnabled = app.settingsRepository.isMediaBackupEnabled.first()
-                if (isMediaBackupEnabled) {
-                    MediaObserverService.start(context)
+                try {
+                    val isMediaBackupEnabled = app.settingsRepository.isMediaBackupEnabledDirect()
+                    if (isMediaBackupEnabled) {
+                        MediaObserverService.start(context)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
             }
         }

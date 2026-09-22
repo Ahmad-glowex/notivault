@@ -13,8 +13,17 @@ interface ChatDao {
 
     @Query("""
         SELECT * FROM chat_threads 
-        WHERE (:packageName IN ('com.whatsapp', 'com.whatsapp.w4b') AND packageName IN ('com.whatsapp', 'com.whatsapp.w4b'))
-           OR (:packageName NOT IN ('com.whatsapp', 'com.whatsapp.w4b') AND packageName = :packageName)
+        WHERE (:packageName IN ('com.whatsapp', 'com.whatsapp.w4b', 'com.gbwhatsapp', 'com.fmwhatsapp', 'com.yowhatsapp') 
+               AND packageName IN ('com.whatsapp', 'com.whatsapp.w4b', 'com.gbwhatsapp', 'com.fmwhatsapp', 'com.yowhatsapp'))
+           OR (:packageName IN ('org.telegram.messenger', 'org.telegram.messenger.web', 'org.telegram.messenger.beta', 'org.thunderdog.challegram', 'org.telegram.plus', 'nekox.rubymemory.nekogram')
+               AND packageName IN ('org.telegram.messenger', 'org.telegram.messenger.web', 'org.telegram.messenger.beta', 'org.thunderdog.challegram', 'org.telegram.plus', 'nekox.rubymemory.nekogram'))
+           OR (:packageName IN ('com.facebook.orca', 'com.facebook.mlite')
+               AND packageName IN ('com.facebook.orca', 'com.facebook.mlite'))
+           OR (:packageName IN ('com.instagram.android', 'com.instagram.lite')
+               AND packageName IN ('com.instagram.android', 'com.instagram.lite'))
+           OR (:packageName IN ('com.imo.android.imoim', 'com.imo.android.imolite', 'com.imo.android.imoimbeta')
+               AND packageName IN ('com.imo.android.imoim', 'com.imo.android.imolite', 'com.imo.android.imoimbeta'))
+           OR (packageName = :packageName)
         ORDER BY isPinned DESC, lastMessageTimestamp DESC
     """)
     fun getThreadsByPackage(packageName: String): Flow<List<ChatThreadEntity>>
@@ -38,8 +47,17 @@ interface ChatDao {
 
     @Query("""
         SELECT * FROM chat_threads 
-        WHERE ((:packageName IN ('com.whatsapp', 'com.whatsapp.w4b') AND packageName IN ('com.whatsapp', 'com.whatsapp.w4b'))
-           OR (:packageName NOT IN ('com.whatsapp', 'com.whatsapp.w4b') AND packageName = :packageName))
+        WHERE ((:packageName IN ('com.whatsapp', 'com.whatsapp.w4b', 'com.gbwhatsapp', 'com.fmwhatsapp', 'com.yowhatsapp') 
+                AND packageName IN ('com.whatsapp', 'com.whatsapp.w4b', 'com.gbwhatsapp', 'com.fmwhatsapp', 'com.yowhatsapp'))
+            OR (:packageName IN ('org.telegram.messenger', 'org.telegram.messenger.web', 'org.telegram.messenger.beta', 'org.thunderdog.challegram', 'org.telegram.plus', 'nekox.rubymemory.nekogram')
+                AND packageName IN ('org.telegram.messenger', 'org.telegram.messenger.web', 'org.telegram.messenger.beta', 'org.thunderdog.challegram', 'org.telegram.plus', 'nekox.rubymemory.nekogram'))
+            OR (:packageName IN ('com.facebook.orca', 'com.facebook.mlite')
+                AND packageName IN ('com.facebook.orca', 'com.facebook.mlite'))
+            OR (:packageName IN ('com.instagram.android', 'com.instagram.lite')
+                AND packageName IN ('com.instagram.android', 'com.instagram.lite'))
+            OR (:packageName IN ('com.imo.android.imoim', 'com.imo.android.imolite', 'com.imo.android.imoimbeta')
+                AND packageName IN ('com.imo.android.imoim', 'com.imo.android.imolite', 'com.imo.android.imoimbeta'))
+            OR (packageName = :packageName))
           AND (chatTitle LIKE '%' || :query || '%' OR lastMessageText LIKE '%' || :query || '%')
         ORDER BY lastMessageTimestamp DESC
     """)
@@ -58,5 +76,5 @@ interface ChatDao {
     suspend fun deleteAllThreads()
 
     @Query("DELETE FROM chat_threads WHERE threadId NOT IN (SELECT DISTINCT threadId FROM messages)")
-    suspend fun deleteEmptyThreads(): Int
+    suspend fun deleteEmptyThreads()
 }

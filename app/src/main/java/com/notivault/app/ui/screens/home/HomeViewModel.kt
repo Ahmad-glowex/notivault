@@ -64,12 +64,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectPackage(packageName: String?) {
         _selectedPackage.value = packageName
-        _selectedTab.value = when (packageName) {
-            com.notivault.app.data.local.CoreApps.PACKAGE_WHATSAPP,
-            com.notivault.app.data.local.CoreApps.PACKAGE_WHATSAPP_W4B -> AppTab.WHATSAPP
-            com.notivault.app.data.local.CoreApps.PACKAGE_TELEGRAM -> AppTab.TELEGRAM
-            com.notivault.app.data.local.CoreApps.PACKAGE_MESSENGER -> AppTab.MESSENGER
-            com.notivault.app.data.local.CoreApps.PACKAGE_INSTAGRAM -> AppTab.INSTAGRAM
+        _selectedTab.value = when {
+            packageName == null -> AppTab.ALL
+            com.notivault.app.data.local.CoreApps.isWhatsApp(packageName) -> AppTab.WHATSAPP
+            com.notivault.app.data.local.CoreApps.isTelegram(packageName) -> AppTab.TELEGRAM
+            com.notivault.app.data.local.CoreApps.isMessenger(packageName) -> AppTab.MESSENGER
+            com.notivault.app.data.local.CoreApps.isInstagram(packageName) -> AppTab.INSTAGRAM
             else -> AppTab.ALL
         }
     }

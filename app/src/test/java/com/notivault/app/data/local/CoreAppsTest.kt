@@ -11,9 +11,15 @@ class CoreAppsTest {
     fun testCorePackagesDefinitions() {
         assertTrue(CoreApps.isCoreApp("com.whatsapp"))
         assertTrue(CoreApps.isCoreApp("com.whatsapp.w4b"))
+        assertTrue(CoreApps.isCoreApp("com.gbwhatsapp"))
         assertTrue(CoreApps.isCoreApp("com.facebook.orca"))
+        assertTrue(CoreApps.isCoreApp("com.facebook.mlite"))
         assertTrue(CoreApps.isCoreApp("org.telegram.messenger"))
+        assertTrue(CoreApps.isCoreApp("org.telegram.messenger.web"))
+        assertTrue(CoreApps.isCoreApp("org.thunderdog.challegram"))
+        assertTrue(CoreApps.isCoreApp("org.telegram.plus"))
         assertTrue(CoreApps.isCoreApp("com.instagram.android"))
+        assertTrue(CoreApps.isCoreApp("com.instagram.lite"))
 
         // Non-core apps must NOT be treated as core
         assertFalse(CoreApps.isCoreApp("com.openai.chatgpt"))

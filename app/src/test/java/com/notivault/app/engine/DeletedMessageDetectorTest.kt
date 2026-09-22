@@ -148,6 +148,33 @@ class DeletedMessageDetectorTest {
     }
 
     @Test
+    fun testBengaliAndEnglishEdgeCases() {
+        // Bengali variations
+        assertTrue(DeletedMessageDetector.isDeletedNotification("এই মেসেজটি মুছে ফেলা হয়েছে"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("এই মেসেজটি মুছে ফেলা হয়েছে"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("একটি মেসেজ মুছে ফেলা হয়েছে"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("আপনি একটি মেসেজ মুছে ফেলেছেন"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("মেসেজ মুছে ফেলা হয়েছে"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("মেসেজ মুছে দেওয়া হয়েছে"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("মেসেজ মুছে দেয়া হয়েছে"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("মুছে ফেলা হয়েছে"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("মুছে দেওয়া হয়েছে"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("মুছে দেয়া হয়েছে"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("মুছে ফেলেছেন"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("মুছে দিয়েছেন"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("Ahmad: এই মেসেজটি মুছে ফেলা হয়েছে"))
+
+        // English variations
+        assertTrue(DeletedMessageDetector.isDeletedNotification("Deleted photo"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("Deleted video"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("This media was deleted"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("1 deleted message"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("Alice unsent a message"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("You unsent a message"))
+        assertTrue(DeletedMessageDetector.isDeletedNotification("Message was unsent"))
+    }
+
+    @Test
     fun testNonDeletedMessagesDoNotTrigger() {
         // Critical: conversational mentions of deletion in any language MUST NOT trigger unsend logic
         assertFalse(DeletedMessageDetector.isDeletedNotification("Why was the message deleted?"))

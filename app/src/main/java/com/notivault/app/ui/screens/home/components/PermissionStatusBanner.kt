@@ -89,6 +89,7 @@ fun PermissionStatusBanner(
                 onClick = {
                     val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
                     context.startActivity(intent)
+                    com.notivault.app.service.NotiVaultListenerService.ensureServiceConnected(context)
                     onRefresh()
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = DeletedRed),

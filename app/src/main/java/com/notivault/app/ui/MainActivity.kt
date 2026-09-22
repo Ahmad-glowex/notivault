@@ -57,6 +57,7 @@ class MainActivity : FragmentActivity() {
 
         lifecycleScope.launch {
             try {
+                com.notivault.app.service.NotiVaultListenerService.ensureServiceConnected(this@MainActivity)
                 if (settingsRepo.isMediaBackupEnabled.first()) {
                     com.notivault.app.service.media.MediaObserverService.start(this@MainActivity)
                 }
@@ -125,6 +126,11 @@ class MainActivity : FragmentActivity() {
             // Biometric not configured or unavailable on device, allow access
             onSuccess()
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        com.notivault.app.service.NotiVaultListenerService.ensureServiceConnected(this)
     }
 }
 

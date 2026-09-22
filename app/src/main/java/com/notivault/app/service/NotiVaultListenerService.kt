@@ -1,17 +1,22 @@
 package com.notivault.app.service
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import com.notivault.app.NotiVaultApp
 import com.notivault.app.R
+import com.notivault.app.data.local.CoreApps
 import com.notivault.app.data.local.entity.AppEntity
 import com.notivault.app.service.parser.NotificationParser
 import com.notivault.app.service.media.MediaCacheManager
@@ -19,7 +24,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class NotiVaultListenerService : NotificationListenerService() {
@@ -39,6 +43,58 @@ class NotiVaultListenerService : NotificationListenerService() {
             "com.android.vending",
             "com.google.android.gms"
         )
+
+        /**
+         * Ensures that NotiVaultListenerService is bound and connected by Android's NotificationManagerService.
+         * Toggles the component setting if needed to trigger system re-registration on devices that kill services.
+         */
+        fun ensureServiceConnected(context: Context) {
+            val componentName = ComponentName(context, NotiVaultListenerService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                try {
+                    requestRebind(componentName)
+                    Log.d(TAG, "requestRebind initiated for NotiVaultListenerService")
+                } catch (e: Exception) {
+                    Log.w(TAG, "requestRebind failed: ${e.message}")
+                }
+            }
+            try {
+                val enabledListeners = NotificationManagerCompat.getEnabledListenerPackages(context)
+                if (enabledListeners.contains(context.packageName)) {
+                    val pm = context.packageManager
+                    pm.setComponentEnabledSetting(
+                        componentName,
+                        PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                        PackageManager.DONT_KILL_APP
+                    )
+                    pm.setComponentEnabledSetting(
+                        componentName,
+                        PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                        PackageManager.DONT_KILL_APP
+                    )
+                    Log.d(TAG, "Component re-enabled to refresh NotificationListener binding")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed component toggle rebind: ${e.message}")
+            }
+        }
+    }
+
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        Log.i(TAG, "NotiVaultListenerService connected successfully to Android Notification System")
+    }
+
+    override fun onListenerDisconnected() {
+        super.onListenerDisconnected()
+        Log.w(TAG, "NotiVaultListenerService disconnected! Attempting immediate rebind...")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            try {
+                requestRebind(ComponentName(this, NotiVaultListenerService::class.java))
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to rebind in onListenerDisconnected", e)
+            }
+        }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -48,30 +104,29 @@ class NotiVaultListenerService : NotificationListenerService() {
         val packageName = sbn.packageName ?: return
         if (packageName in IGNORED_PACKAGES) return
 
-        // Skip ongoing notifications (e.g., media player playback, call in progress)
+        // Skip ongoing notifications (e.g., media playback, live call, download progress)
         if (sbn.isOngoing) return
-
-        // Unconditionally skip group summary notifications to prevent duplicate messages
-        if ((sbn.notification.flags and android.app.Notification.FLAG_GROUP_SUMMARY) != 0) return
 
         val app = application as? NotiVaultApp ?: return
 
         serviceScope.launch {
             try {
-                // Check if notification interception is globally enabled
-                val isInterceptionEnabled = app.settingsRepository.isInterceptionEnabled.first()
+                // Synchronously check if notification interception is globally enabled
+                val isInterceptionEnabled = app.settingsRepository.isInterceptionEnabledDirect()
                 if (!isInterceptionEnabled) {
-                    Log.d(TAG, "Notification interception is paused in settings, skipping notification")
+                    Log.d(TAG, "Notification interception paused, skipping notification from $packageName")
                     return@launch
                 }
 
-                // Check if app is monitored. By default, ONLY core messaging apps are allowed.
-                // Any other app (e.g. ChatGPT, Grove, Muse, Gmail) is NOT captured unless explicitly added by user.
+                // Check if app is monitored:
+                // 1. Explicitly enabled in database
+                // 2. Or a core messaging app (WhatsApp, Messenger, Telegram, Instagram, IMO, Signal, etc.)
+                // 3. Or flagged as a messaging notification (CATEGORY_MESSAGE)
                 val appEntity = app.database.appDao().getApp(packageName)
                 val isMonitored = when {
                     appEntity != null -> appEntity.isEnabled
-                    com.notivault.app.data.local.CoreApps.isCoreApp(packageName) -> {
-                        ensureCoreAppRegistered(app, packageName)
+                    CoreApps.isCoreApp(packageName) || sbn.notification.category == Notification.CATEGORY_MESSAGE -> {
+                        ensureAppRegistered(app, packageName)
                         true
                     }
                     else -> {
@@ -84,8 +139,8 @@ class NotiVaultListenerService : NotificationListenerService() {
                     return@launch
                 }
 
-                val isMediaBackupEnabled = app.settingsRepository.isMediaBackupEnabled.first()
-                val isDeletedAlertEnabled = app.settingsRepository.isDeletedAlertEnabled.first()
+                val isMediaBackupEnabled = app.settingsRepository.isMediaBackupEnabledDirect()
+                val isDeletedAlertEnabled = app.settingsRepository.isDeletedAlertEnabledDirect()
 
                 val parsedItems = NotificationParser.parse(sbn)
                 for (item in parsedItems) {
@@ -97,7 +152,7 @@ class NotiVaultListenerService : NotificationListenerService() {
                             senderName = item.senderName,
                             timestamp = item.timestamp
                         )
-                        Log.d(TAG, "Marked previous message as deleted: $marked")
+                        Log.d(TAG, "Marked message as deleted: $marked")
 
                         if (marked && isDeletedAlertEnabled) {
                             postDeletedAlertNotification(item.chatTitle, item.senderName, item.packageName)
@@ -197,8 +252,7 @@ class NotiVaultListenerService : NotificationListenerService() {
         }
     }
 
-    private suspend fun ensureCoreAppRegistered(app: NotiVaultApp, packageName: String) {
-        if (!com.notivault.app.data.local.CoreApps.isCoreApp(packageName)) return
+    private suspend fun ensureAppRegistered(app: NotiVaultApp, packageName: String) {
         val appDao = app.database.appDao()
         val existing = appDao.getApp(packageName)
         if (existing == null) {
@@ -207,16 +261,15 @@ class NotiVaultListenerService : NotificationListenerService() {
                 val info = pm.getApplicationInfo(packageName, 0)
                 pm.getApplicationLabel(info).toString()
             } catch (_: Exception) {
-                when (packageName) {
-                    com.notivault.app.data.local.CoreApps.PACKAGE_WHATSAPP -> "WhatsApp"
-                    com.notivault.app.data.local.CoreApps.PACKAGE_WHATSAPP_W4B -> "WhatsApp Business"
-                    com.notivault.app.data.local.CoreApps.PACKAGE_MESSENGER -> "Messenger"
-                    com.notivault.app.data.local.CoreApps.PACKAGE_TELEGRAM -> "Telegram"
-                    com.notivault.app.data.local.CoreApps.PACKAGE_INSTAGRAM -> "Instagram"
+                when {
+                    CoreApps.isWhatsApp(packageName) -> "WhatsApp"
+                    CoreApps.isMessenger(packageName) -> "Messenger"
+                    CoreApps.isTelegram(packageName) -> "Telegram"
+                    CoreApps.isInstagram(packageName) -> "Instagram"
                     else -> packageName
                 }
             }
-            val colorHex = com.notivault.app.data.local.CoreApps.getDefaultColor(packageName)
+            val colorHex = CoreApps.getDefaultColor(packageName)
             appDao.insertApp(
                 AppEntity(
                     packageName = packageName,

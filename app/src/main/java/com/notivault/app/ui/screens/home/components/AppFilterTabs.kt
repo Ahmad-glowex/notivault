@@ -43,33 +43,32 @@ fun DynamicAppFilterTabs(
         val list = mutableListOf(DynamicTabItem("All", null))
         val seen = mutableSetOf<String>()
 
-        // Ensure WhatsApp tab is first if either WhatsApp or WhatsApp Business is enabled
+        // Ensure WhatsApp tab is first if any WhatsApp variant is enabled
         val hasWhatsApp = enabledApps.any { CoreApps.isWhatsApp(it.packageName) && it.isEnabled }
         if (hasWhatsApp) {
             list.add(DynamicTabItem("WhatsApp", CoreApps.PACKAGE_WHATSAPP))
-            seen.add(CoreApps.PACKAGE_WHATSAPP)
-            seen.add(CoreApps.PACKAGE_WHATSAPP_W4B)
+            enabledApps.filter { CoreApps.isWhatsApp(it.packageName) }.forEach { seen.add(it.packageName) }
         }
 
         // Messenger
-        val messengerApp = enabledApps.find { it.packageName == CoreApps.PACKAGE_MESSENGER && it.isEnabled }
-        if (messengerApp != null) {
+        val hasMessenger = enabledApps.any { CoreApps.isMessenger(it.packageName) && it.isEnabled }
+        if (hasMessenger) {
             list.add(DynamicTabItem("Messenger", CoreApps.PACKAGE_MESSENGER))
-            seen.add(CoreApps.PACKAGE_MESSENGER)
+            enabledApps.filter { CoreApps.isMessenger(it.packageName) }.forEach { seen.add(it.packageName) }
         }
 
         // Telegram
-        val telegramApp = enabledApps.find { it.packageName == CoreApps.PACKAGE_TELEGRAM && it.isEnabled }
-        if (telegramApp != null) {
+        val hasTelegram = enabledApps.any { CoreApps.isTelegram(it.packageName) && it.isEnabled }
+        if (hasTelegram) {
             list.add(DynamicTabItem("Telegram", CoreApps.PACKAGE_TELEGRAM))
-            seen.add(CoreApps.PACKAGE_TELEGRAM)
+            enabledApps.filter { CoreApps.isTelegram(it.packageName) }.forEach { seen.add(it.packageName) }
         }
 
         // Instagram
-        val instagramApp = enabledApps.find { it.packageName == CoreApps.PACKAGE_INSTAGRAM && it.isEnabled }
-        if (instagramApp != null) {
+        val hasInstagram = enabledApps.any { CoreApps.isInstagram(it.packageName) && it.isEnabled }
+        if (hasInstagram) {
             list.add(DynamicTabItem("Instagram", CoreApps.PACKAGE_INSTAGRAM))
-            seen.add(CoreApps.PACKAGE_INSTAGRAM)
+            enabledApps.filter { CoreApps.isInstagram(it.packageName) }.forEach { seen.add(it.packageName) }
         }
 
         // Any custom added enabled apps
@@ -89,12 +88,13 @@ fun DynamicAppFilterTabs(
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         tabs.forEach { tab ->
-            val isSelected = if (tab.packageName == null) {
-                selectedPackage == null
-            } else if (tab.packageName == CoreApps.PACKAGE_WHATSAPP) {
-                selectedPackage == CoreApps.PACKAGE_WHATSAPP || selectedPackage == CoreApps.PACKAGE_WHATSAPP_W4B
-            } else {
-                selectedPackage == tab.packageName
+            val isSelected = when {
+                tab.packageName == null -> selectedPackage == null
+                CoreApps.isWhatsApp(tab.packageName) -> CoreApps.isWhatsApp(selectedPackage ?: "")
+                CoreApps.isTelegram(tab.packageName) -> CoreApps.isTelegram(selectedPackage ?: "")
+                CoreApps.isMessenger(tab.packageName) -> CoreApps.isMessenger(selectedPackage ?: "")
+                CoreApps.isInstagram(tab.packageName) -> CoreApps.isInstagram(selectedPackage ?: "")
+                else -> selectedPackage == tab.packageName
             }
 
             FilterChip(

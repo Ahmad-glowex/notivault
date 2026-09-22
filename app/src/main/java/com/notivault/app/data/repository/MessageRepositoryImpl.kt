@@ -81,18 +81,13 @@ class MessageRepositoryImpl(
             return@withContext 0L
         }
 
-        // Deduplication: Check if this exact message or duplicate within 30s tolerance exists
+        // Deduplication: Check if this exact message from this sender within 5s tolerance exists
         val existingMsg = messageDao.findExistingMessageWithTolerance(
             threadId = threadId,
             senderName = resolvedSender,
             messageText = messageText,
             timestamp = timestamp,
-            toleranceMs = 30000L
-        ) ?: messageDao.findExistingMessageInThread(
-            threadId = threadId,
-            messageText = messageText,
-            timestamp = timestamp,
-            toleranceMs = 30000L
+            toleranceMs = 5000L
         )
         if (existingMsg != null) {
             // If new notification has media but stored one did not, update media
@@ -205,13 +200,20 @@ class MessageRepositoryImpl(
         if (targetMessage != null) {
             messageDao.markMessageAsDeleted(targetMessage.id, timestamp)
 
-            // Update thread last message preview if this was the latest message
+            // Update thread last message preview and bump timestamp
             val currentThread = chatDao.getThreadSync(threadId)
-            if (currentThread != null && currentThread.lastMessageTimestamp <= targetMessage.timestamp) {
+            if (currentThread != null) {
+                val updatedPreview = if (currentThread.lastMessageText.contains("(Deleted)", ignoreCase = true)) {
+                    currentThread.lastMessageText
+                } else if (currentThread.lastMessageText == targetMessage.messageText) {
+                    "${targetMessage.messageText} (Deleted)"
+                } else {
+                    "${currentThread.lastMessageText} (Deleted)"
+                }
                 chatDao.insertOrUpdateThread(
                     currentThread.copy(
-                        lastMessageText = "${targetMessage.messageText} (Deleted)",
-                        lastMessageTimestamp = timestamp
+                        lastMessageText = updatedPreview,
+                        lastMessageTimestamp = maxOf(currentThread.lastMessageTimestamp, timestamp)
                     )
                 )
             }
@@ -302,15 +304,14 @@ class MessageRepositoryImpl(
             messageDao.getAllMessagesSync()
         }
 
-        val grouped = messages.groupBy { "${it.threadId}___${it.messageText.trim()}" }
+        val grouped = messages.groupBy { "${it.threadId}___${it.senderName.trim()}___${it.messageText.trim()}" }
         for ((_, list) in grouped) {
             if (list.size <= 1) continue
             val sorted = list.sortedBy { it.timestamp }
             var baseMsg = sorted[0]
             for (i in 1 until sorted.size) {
                 val candidate = sorted[i]
-                if (Math.abs(candidate.timestamp - baseMsg.timestamp) <= 30000L) {
-                    // Duplicate within 15 seconds tolerance!
+                if (Math.abs(candidate.timestamp - baseMsg.timestamp) <= 5000L) {
                     if (!candidate.mediaUri.isNullOrEmpty() && baseMsg.mediaUri.isNullOrEmpty()) {
                         messageDao.updateMessageMedia(baseMsg.id, candidate.mediaUri!!, candidate.mediaMimeType)
                         baseMsg = baseMsg.copy(mediaUri = candidate.mediaUri, hasMedia = true, mediaMimeType = candidate.mediaMimeType)

@@ -38,11 +38,6 @@ object NotificationParser {
         val fallbackText = (extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
             ?: extras.getCharSequence(Notification.EXTRA_TEXT))?.toString()?.trim() ?: ""
 
-        // Unconditionally drop all group summary notifications. Summary notifications must never
-        // be parsed as messages since individual child notifications are already emitted.
-        if ((notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0) {
-            return emptyList()
-        }
 
         // 1. First-class: AndroidX NotificationCompat.MessagingStyle extraction
         val messagingStyle = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
@@ -263,7 +258,15 @@ object NotificationParser {
 
         // 3. Fallback: Standard single-notification text (BigTextStyle / Normal)
         if (results.isEmpty()) {
-            if (fallbackText.isNotBlank() || extraBitmap != null || extraIcon != null) {
+            val isSummaryFlag = (notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0
+            val isDeletedNotice = DeletedMessageDetector.isDeletedNotification(fallbackText)
+            val isSummaryText = isSummaryPlaceholderText(fallbackText)
+
+            // Drop fallback text if it's a pure group summary header (e.g. "3 new messages" / "2 chats")
+            // BUT never drop if it's a deleted message notification or contains attached media!
+            val shouldSkipSummary = isSummaryFlag && isSummaryText && !isDeletedNotice && extraBitmap == null && extraIcon == null
+
+            if (!shouldSkipSummary && (fallbackText.isNotBlank() || extraBitmap != null || extraIcon != null)) {
                 val (chatTitle, senderName, cleanText) = resolveTitleAndSender(
                     packageName = packageName,
                     rawTitle = rawTitle,
@@ -309,6 +312,19 @@ object NotificationParser {
         }
 
         return results
+    }
+
+    internal fun isSummaryPlaceholderText(text: String): Boolean {
+        if (text.isBlank()) return true
+        val clean = DeletedMessageDetector.sanitize(text).lowercase()
+        return clean.matches(Regex("""^\d+\s+(?:new\s+)?messages?.*""")) ||
+                clean.matches(Regex(""".*messages?\s+from\s+\d+\s+chats?.*""")) ||
+                clean.matches(Regex("""^\d+টি\s+নতুন\s+মেসেজ.*""")) ||
+                clean.matches(Regex(""".*চ্যাট\s+থেকে\s+\d+টি\s+মেসেজ.*""")) ||
+                clean.matches(Regex("""^\d+\s+(?:nuevos?\s+)?mensajes?.*""")) ||
+                clean.matches(Regex("""^\d+\s+(?:nouveaux?\s+)?messages?.*""")) ||
+                clean.matches(Regex("""^\d+\s+новые?\s+сообщения?.*""")) ||
+                clean.matches(Regex("""^\d+\s+unread\s+messages?.*"""))
     }
 
     internal fun isVideoIndicatingText(text: String): Boolean {

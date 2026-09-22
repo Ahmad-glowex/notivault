@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import java.util.Collections
 
 interface SettingsRepository {
     val isBiometricLockEnabled: Flow<Boolean>
@@ -23,6 +24,11 @@ interface SettingsRepository {
     fun setDeletedAlertEnabled(enabled: Boolean)
     fun setAutoCleanupDays(days: Int)
     fun isAppLocked(): Boolean
+
+    // Direct synchronous access methods for services & background workers
+    fun isInterceptionEnabledDirect(): Boolean
+    fun isMediaBackupEnabledDirect(): Boolean
+    fun isDeletedAlertEnabledDirect(): Boolean
 }
 
 class SettingsRepositoryImpl(
@@ -31,6 +37,11 @@ class SettingsRepositoryImpl(
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences("notivault_settings", Context.MODE_PRIVATE)
+
+    // Maintain strong references to listeners to prevent Android SharedPreferences weak reference GC bug
+    private val activeListeners = Collections.synchronizedSet(
+        mutableSetOf<SharedPreferences.OnSharedPreferenceChangeListener>()
+    )
 
     companion object {
         private const val KEY_BIOMETRIC_LOCK = "key_biometric_lock"
@@ -82,6 +93,18 @@ class SettingsRepositoryImpl(
         return prefs.getBoolean(KEY_BIOMETRIC_LOCK, false)
     }
 
+    override fun isInterceptionEnabledDirect(): Boolean {
+        return prefs.getBoolean(KEY_INTERCEPTION, true)
+    }
+
+    override fun isMediaBackupEnabledDirect(): Boolean {
+        return prefs.getBoolean(KEY_MEDIA_BACKUP, true)
+    }
+
+    override fun isDeletedAlertEnabledDirect(): Boolean {
+        return prefs.getBoolean(KEY_DELETED_ALERT, true)
+    }
+
     private fun stringPreferenceFlow(key: String, defaultValue: String): Flow<String> = callbackFlow {
         trySend(prefs.getString(key, defaultValue) ?: defaultValue)
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, changedKey ->
@@ -89,9 +112,11 @@ class SettingsRepositoryImpl(
                 trySend(prefs.getString(key, defaultValue) ?: defaultValue)
             }
         }
+        activeListeners.add(listener)
         prefs.registerOnSharedPreferenceChangeListener(listener)
         awaitClose {
             prefs.unregisterOnSharedPreferenceChangeListener(listener)
+            activeListeners.remove(listener)
         }
     }
 
@@ -102,9 +127,11 @@ class SettingsRepositoryImpl(
                 trySend(prefs.getInt(key, defaultValue))
             }
         }
+        activeListeners.add(listener)
         prefs.registerOnSharedPreferenceChangeListener(listener)
         awaitClose {
             prefs.unregisterOnSharedPreferenceChangeListener(listener)
+            activeListeners.remove(listener)
         }
     }
 
@@ -115,9 +142,11 @@ class SettingsRepositoryImpl(
                 trySend(prefs.getBoolean(key, defaultValue))
             }
         }
+        activeListeners.add(listener)
         prefs.registerOnSharedPreferenceChangeListener(listener)
         awaitClose {
             prefs.unregisterOnSharedPreferenceChangeListener(listener)
+            activeListeners.remove(listener)
         }
     }
 }
